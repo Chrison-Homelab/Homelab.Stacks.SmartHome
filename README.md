@@ -1,12 +1,34 @@
 # SmartHome
 
+[![validate](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/actions/workflows/validate.yml/badge.svg)](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/actions/workflows/validate.yml)
+[![Built with Fallout](https://img.shields.io/badge/built%20with-Fallout-8A2BE2)](https://github.com/Fallout-build/Fallout)
+[![Homelab stack](https://img.shields.io/badge/homelab-stack-0ea5e9)](https://github.com/Chrison-Homelab/Homelab)
+
 The home-automation / IoT **support layer** — the infrastructure that feeds
 Home Assistant. Built to grow: MQTT is the first member; zigbee2mqtt, node-red,
 esphome, zwave-js-ui, frigate, etc. drop into this same stack + broker as needed.
 
-```
-Leapmotor Mate (CT 4100, IoT 1040) ──publish──▶  Mosquitto (CT 6000, IoT 1040)  ◀──subscribe── Home Assistant (VM 2000)
-                                                  auth + HA-discovery topics              auto-creates the C10 device/entities
+A [`Homelab.Stacks.*`](https://github.com/Chrison-Homelab/Homelab) submodule
+(mounts at `stacks/SmartHome`), converged by the Fallout engine.
+
+```mermaid
+flowchart LR
+  MATE["🚗 Leapmotor Mate<br/>CT 4100"] -->|publish| BROKER
+  ESP["📟 ESPHome<br/>CT 6003"] -->|publish| BROKER
+  BROKER["📮 Mosquitto broker<br/>CT 6000 · 10.40.26.247<br/>auth + HA-discovery"]
+  BROKER <-->|"pub/sub + discovery"| HA["🏠 Home Assistant<br/>VM 2000 (adopted)"]
+  MATTER["🔌 matter-server<br/>CT 6001"] -. "WebSocket" .-> HA
+  AIR["📺 aircast<br/>CT 6002 · AirPlay"]
+
+  subgraph IOT["IoT VLAN 1040"]
+    MATE
+    ESP
+    BROKER
+    MATTER
+    AIR
+  end
+  classDef bus fill:#dbeafe,stroke:#2563eb;
+  class BROKER bus;
 ```
 
 ## Members
