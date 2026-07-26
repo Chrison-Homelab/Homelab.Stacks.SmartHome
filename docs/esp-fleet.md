@@ -1,7 +1,7 @@
 # ESP board inventory — the DIY fleet
 
 Bare ESP boards on hand for home-built devices, flashed + managed via the planned
-**ESPHome LXC (CT 6003, [#251](https://github.com/Chrison-dev/Homelab/issues/251))**.
+**ESPHome LXC (CT 6003, [#251](https://github.com/Chrison-Homelab/Homelab/issues/251))**.
 Seeded 2026-07-18.
 
 ## What's on hand
@@ -40,7 +40,7 @@ Seeded 2026-07-18.
 
 ## Related
 
-- ESPHome LXC (dashboard/builder): [#251](https://github.com/Chrison-dev/Homelab/issues/251).
+- ESPHome LXC (dashboard/builder): [#251](https://github.com/Chrison-Homelab/Homelab/issues/251).
 - BLE-proxy rationale + the Xiaomi sensor integration: [`devices/xiaomi-lywsd03mmc/`](devices/xiaomi-lywsd03mmc/).
 - ESL-2 alarm bridge (an ESP32 project): [`devices/arrowhead-esl-2/`](devices/arrowhead-esl-2/).
 </content>
