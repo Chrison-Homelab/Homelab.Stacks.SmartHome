@@ -1,0 +1,68 @@
+# SmartHome podman host — the stack's rootless Podman + quadlet host (ADR-0009, #285).
+#
+# DELIBERATELY GENERIC. This is *the SmartHome stack's container host*, not the
+# Leapmotor box. Leapmotor Mate is simply the first service to land here — the
+# Phase-1 pilot chosen because it's the smallest live stack (one container, no NFS,
+# all state on local disk), so the fiddly rootless plumbing proves itself where the
+# blast radius is smallest. Further SmartHome services join as extra quadlets in
+# podman-host/quadlets/ rather than as new one-app Docker CTs.
+#
+# IN-BLOCK by design: 6004 sits inside this stack's 6000–6099 range, unlike the
+# CT 4100 it replaces (which was adopted in-place, out-of-block). Part of the point
+# of the migration is getting Mate back inside the block.
+#
+# WHAT THE ENGINE DOES HERE (app: podman → PodmanProvisioner, superproject #284):
+#   ct/podman.sh creates the CT (rootful podman + a root podman.socket), then the
+#   provisioner converts it to the rootless quadlet model — masks that socket, adds
+#   the non-root `podman` user with an in-map subuid range + linger, makes
+#   network-online.target reachable, renders the quadlets below and drives
+#   `systemctl --user`. Read docs/plans/284-podman-platform.md in the superproject
+#   before touching a quadlet: the eight gotchas there are all load-bearing.
+#
+# EXPOSURE — INTERNAL-ONLY, same as the CT it replaces. No tunnel ingress. Reached
+# over VLAN 1040 (IoT) only; Mate stores dedicated-Leapmotor-account credentials, so
+# it stays off the public net (MATE_AUTH_PASSWORD gates the UI regardless).
+#
+# Validate against ../../Infrastructure/schema/shape.schema.json.
+
+apiVersion: homelab/v1
+kind: LXC
+
+metadata:
+  name: podman-host
+  stack: SmartHome
+  tags: [podman, quadlet, container-host, adr-0009]
+
+spec:
+  app: podman            # community-scripts ct/podman.sh + the `podman` provisioner
+  ctid: 6004             # in-block (6000–6099); 6000 mqtt · 6001 matter · 6002 aircast · 6003 esphome
+  cores: 1               # light: one Python container polling a car API
+  memory: 1024           # MB — podman + one container + SQLite
+  disk: 10               # GB — image layers + Mate's SQLite/state under /home/podman
+
+  features:
+    nesting: true        # rootless podman needs nesting for its own nested userns
+    keyctl: true         # containers keyring — settable only via the pct/SSH create path
+    fuse: true           # fuse-overlayfs fallback storage driver
+                         # NOTE: ct/podman.sh silently DROPS var_fuse; the provisioner
+                         # reconciles features from this shape after create (#284).
+
+  # node / network / os / source / timezone inherited from stack.yaml defaults (VLAN 1040).
+
+  config:
+    # Rootless user + subuid window. The default 10000:50000 fits inside an
+    # unprivileged LXC's own 65536-uid map — the provisioner verifies this against
+    # /proc/self/uid_map and fails loudly rather than letting podman break at first run.
+    user: podman
+    quadlets: podman-host/quadlets
+
+    # podman secrets seeded from secrets.env, add-only (rotation is an explicit
+    # operator action, never a silent converge side effect).
+    #
+    # Only MATE_AUTH_PASSWORD is wired. MATE_SECRET_KEY is deliberately NOT set:
+    # Mate auto-generates it into its data dir when the env var is absent, which is
+    # exactly what the live CT 4100 does today (its .env has the key blank). Setting
+    # it here would encrypt stored credentials under a DIFFERENT key than the
+    # migrated database expects.
+    secrets:
+      mate_auth_password: MATE_AUTH_PASSWORD
