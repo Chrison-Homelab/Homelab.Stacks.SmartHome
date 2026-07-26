@@ -1,0 +1,62 @@
+# Leapmotor Mate — C10 companion, as a rootless podman quadlet (ADR-0009 / #285).
+# Converted from leapmotor-mate/compose.yml. Keep the two in sync until CT 4100 is
+# retired for good; after that this file is the only definition.
+#
+# Bind mounts, not named volumes, deliberately: the migration seeds 22 MB of EXISTING
+# state (SQLite history, uploaded mTLS certs, and the auto-generated MATE_SECRET_KEY)
+# copied off CT 4100, and a host path is far easier to seed, inspect and back up than
+# a named volume's internal mountpoint. Paths live under the rootless user's home, so
+# they're owned by `podman` with no :U/keep-id gymnastics needed.
+
+[Unit]
+Description=Leapmotor Mate — Leapmotor C10 companion (rootless podman)
+Documentation=https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome
+# network-online.target is made reachable by the provisioner; without that fix podman's
+# injected wait-network helper spins for ~92s every boot before this starts (#284 gotcha 7).
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=ghcr.io/protossblaster/leapmotor-mate:latest
+ContainerName=leapmotor-mate
+
+# Rootless publishes fine above 1024 (no sysctl needed). Same port as the Docker CT.
+PublishPort=4000:4000
+
+Environment=TZ=Pacific/Auckland
+
+# Gates the web UI. Seeded as a podman secret from secrets.env by the provisioner.
+# MATE_SECRET_KEY is intentionally absent — Mate auto-generates it into /data when
+# unset (matching CT 4100), and it must stay paired with the migrated database.
+Secret=mate_auth_password,type=env,target=MATE_AUTH_PASSWORD
+
+# Persistent state: SQLite DB, uploaded certs, generated secret key.
+Volume=/home/podman/leapmotor/data:/data
+# Read-only convenience copy of the mTLS client certs for the setup wizard.
+Volume=/home/podman/leapmotor/certs:/certs:ro
+
+# The image ships NO curl/wget — use its bundled python. urlopen follows the
+# "/" -> "/setup" 307 and raises on HTTP >= 400, so a clean exit means the UI is serving.
+HealthCmd=python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/').status < 400 else 1)"
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+HealthStartPeriod=30s
+
+# Replaces Watchtower: podman-auto-update.timer (enabled by the provisioner) pulls a
+# newer :latest and restarts this unit, with no docker.sock anywhere.
+AutoUpdate=registry
+
+[Service]
+# compose's `restart: unless-stopped` has no systemd equivalent; Restart=always is the
+# closest correct mapping (a deliberate `systemctl --user stop` still stays stopped,
+# because systemd won't restart a unit it stopped on purpose).
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+# REQUIRED for boot survival. The provisioner does not `systemctl --user enable` a
+# generated unit (it can't — generated units aren't enableable); the quadlet generator
+# creates the default.target wants-symlink from this section instead. Omit it and the
+# unit exists but silently never starts after a reboot (#284 gotcha 6).
+WantedBy=default.target
