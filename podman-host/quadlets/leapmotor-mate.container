@@ -35,19 +35,36 @@ Volume=/home/podman/leapmotor/data:/data
 # Read-only convenience copy of the mTLS client certs for the setup wizard.
 Volume=/home/podman/leapmotor/certs:/certs:ro
 
-# The image ships NO curl/wget — use its bundled python. urlopen follows the
-# "/" -> "/setup" 307 and raises on HTTP >= 400, so a clean exit means the UI is serving.
-HealthCmd=python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/').status < 400 else 1)"
-HealthInterval=30s
-HealthTimeout=10s
-HealthRetries=3
-HealthStartPeriod=30s
+# NO CONTAINER HEALTHCHECK — deliberate. `HealthCmd` cannot carry a quoted command.
+# Quadlet takes systemd's WORD-SPLIT value and rejoins it, so inner quoting is destroyed no
+# matter how it's written. Both attempts failed live on CT 6004:
+#   HealthCmd=python -c "…'http://…'…"     -> podman got an unterminated string;
+#                                             `/bin/sh: Syntax error: Unterminated quoted
+#                                             string` every 30s, container permanently
+#                                             "unhealthy" while the app served HTTP 200.
+#   HealthCmd="python -c \"…\""            -> the backslashes survived LITERALLY.
+# The compose healthcheck this was converted from needs a quoted python one-liner (the image
+# ships no curl/wget), so it simply cannot be expressed here. systemd's Restart=always below
+# already covers process death; what's lost is "hung but alive" detection, and a container
+# stuck permanently unhealthy is worse than no healthcheck at all.
+#
+# To restore one later, it must be QUOTE-FREE — e.g. `HealthCmd=python /opt/health.py` with
+# the script rendered onto the host. That needs the provisioner to render non-quadlet assets
+# (it currently renders only *.container/*.volume/*.network/*.pod), so it's a platform
+# change, not a quadlet tweak.
 
 # Replaces Watchtower: podman-auto-update.timer (enabled by the provisioner) pulls a
 # newer :latest and restarts this unit, with no docker.sock anywhere.
 AutoUpdate=registry
 
 [Service]
+# Podman does NOT create missing bind-mount source directories (Docker does), so without
+# this the unit crash-loops with "Error: statfs /home/podman/leapmotor/certs: no such file
+# or directory". Found live on CT 6004. Makes the unit self-sufficient: a first start
+# creates empty dirs (Mate boots into its setup wizard), and the migration later seeds
+# them with the real state from CT 4100.
+ExecStartPre=/usr/bin/mkdir -p /home/podman/leapmotor/data /home/podman/leapmotor/certs
+
 # compose's `restart: unless-stopped` has no systemd equivalent; Restart=always is the
 # closest correct mapping (a deliberate `systemctl --user stop` still stays stopped,
 # because systemd won't restart a unit it stopped on purpose).
