@@ -4,8 +4,8 @@ Bench-setup for the **read-only keypad-bus tap** on the Arrowhead ESL-2 (ELITE-S
 Goal: sniff `CLK/DAT`, confirm the real bus clock rate, and capture `10000001`-flagged
 frames — with gear on hand plus a couple of cheap parts.
 
-Tracking: [#255](https://github.com/Chrison-dev/Homelab/issues/255) (build) ·
-[#263](https://github.com/Chrison-dev/Homelab/issues/263) (this checklist).
+Tracking: [#255](https://github.com/Chrison-Homelab/Homelab/issues/255) (build) ·
+[#263](https://github.com/Chrison-Homelab/Homelab/issues/263) (this checklist).
 See also [`../README.md`](../README.md).
 
 ## Bill of materials
