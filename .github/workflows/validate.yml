@@ -6,7 +6,7 @@ name: validate
 # on ubuntu-latest — no .NET SDK / private feeds / self-hosted runner.
 #
 # Requires the org/repo secret SCHEMA_RO_PAT — a fine-grained PAT with
-# contents:read on Chrison-dev/Homelab (to download the release asset). Until
+# contents:read on Chrison-Homelab/Homelab (to download the release asset). Until
 # it's set, this check fails at the download step.
 
 on:
@@ -15,6 +15,6 @@ on:
 
 jobs:
   shapes:
-    uses: Chrison-dev/Homelab/.github/workflows/_validate-shapes.yml@main
+    uses: Chrison-Homelab/Homelab/.github/workflows/_validate-shapes.yml@main
     secrets:
       schema_token: ${{ secrets.SCHEMA_RO_PAT }}
