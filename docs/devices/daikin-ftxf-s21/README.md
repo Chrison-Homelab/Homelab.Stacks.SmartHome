@@ -32,7 +32,7 @@ FTXF50 is in the Cora/FTXF family that's on Faikin's
 ## Firmware: ESPHome `daikin_s21` (decided)
 
 Two viable stacks tap S21; we're going **ESPHome** because it lands as a native HA
-climate entity via our planned **ESPHome LXC (CT 6003, [#251](https://github.com/Chrison-dev/Homelab/issues/251))**
+climate entity via our planned **ESPHome LXC (CT 6003, [#251](https://github.com/Chrison-Homelab/Homelab/issues/251))**
 and keeps the fleet uniform (same builder/dashboard as every other DIY node).
 
 - **Chosen:** [`joshbenner/esphome-daikin-s21`](https://github.com/joshbenner/esphome-daikin-s21)
@@ -85,7 +85,7 @@ device doc when we tackle it; this doc is Daikin-only.
 
 - [ ] Order the [BOM](hardware/README.md#bill-of-materials) (level shifter, JST
       EHR-5 pigtail, optional buck). C6 already on hand (ESP fleet).
-- [ ] Stand up the **ESPHome LXC** ([#251](https://github.com/Chrison-dev/Homelab/issues/251))
+- [ ] Stand up the **ESPHome LXC** ([#251](https://github.com/Chrison-Homelab/Homelab/issues/251))
       — prerequisite for OTA-flashing + the native API.
 - [ ] Bench-wire C6 ↔ level shifter ↔ a 5 V UART loopback; flash
       [`esphome-daikin-downstairs.yaml.example`](esphome-daikin-downstairs.yaml.example); confirm the
