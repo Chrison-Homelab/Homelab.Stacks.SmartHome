@@ -56,6 +56,12 @@ spec:
     user: podman
     quadlets: podman-host/quadlets
 
+    # Cockpit management UI + the rootless API socket it reads (ADR-0009 phase 3, #283).
+    # This host is NOT scraped by Prometheus — it sits on IoT VLAN 1040, firewalled off from
+    # 1010 — so the socket here exists purely for the local management UI.
+    userSocket: true
+    cockpit: true
+
     # podman secrets seeded from secrets.env, add-only (rotation is an explicit
     # operator action, never a silent converge side effect).
     #
