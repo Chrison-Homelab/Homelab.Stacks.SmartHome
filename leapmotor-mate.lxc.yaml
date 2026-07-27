@@ -23,13 +23,17 @@
 # member to this stack (+ dependsOn) and gate with CF Access.
 # Validate against ../../Infrastructure/schema/shape.schema.json.
 
+# ⚠️ RETIRED — superseded by CT 6004 (SmartHome podman host) (#285). The guest is STOPPED and tagged
+# `retired` in Proxmox, awaiting a manual delete decision. The tag is declared below so a
+# converge does not strip it (CtConfigReconciler reconciles tags and would treat it as drift).
+# DELETE THIS SHAPE once the guest is destroyed.
 apiVersion: homelab/v1
 kind: LXC
 
 metadata:
   name: leapmotor-mate
   stack: SmartHome
-  tags: [leapmotor, car, ev, docker]
+  tags: [leapmotor, car, ev, docker, retired]   # RETIRED — replaced by CT 6004 (SmartHome podman host), #285
 
 spec:
   app: docker            # community-scripts slug → ct/docker.sh (Docker Engine host)
