@@ -9,8 +9,52 @@ arm/disarm, outputs, system health) **without** buying the paid RS232 board and
 - **RS232-BD V2 protocol manual** ([`RS232-BD-V2-protocol.pdf`](RS232-BD-V2-protocol.pdf))
   from Arrowhead support — fully documents the RS232 ASCII protocol the board
   emits/accepts. Transcribed to [`rs232-protocol.md`](rs232-protocol.md).
+- **ESL-2 Installation & Programming Guide V9** ([`ESL-2-Install-and-Program-Manual.pdf`](ESL-2-Install-and-Program-Manual.pdf))
+  — the official AAP manual for *our* panel. 136 pp, text-searchable. Keypad port is
+  documented on **p34**. 21 MB, and already optimally compressed (re-running Ghostscript
+  `/ebook` makes it *bigger*) — don't bother trying to shrink it.
+- **ELITE-S Installation & Programming Guide v905** ([`Elite-S-Manual-v905.pdf`](Elite-S-Manual-v905.pdf))
+  — same panel family, same **V9** firmware generation, and **the better document of the two**:
+  120 pp but ~5× the extractable text, a full connection diagram (p5), and the programming
+  reference the ESL-2 guide compresses. Reach for this one first.
 - **Hardware on hand:** several **ESP32**, one **Raspberry Pi 1 rev B**.
 - Panel + keypad bus (physical access at home).
+
+### Confirmed from the manuals (2026-07-28)
+
+The keypad-bus wiring assumed throughout this document is **correct**:
+
+> "The terminals marked **POS, NEG, CLOCK, & DATA** make up the communications port which the
+> keypads and other intelligent field devices use to talk to the controller."
+> — ESL-2 guide, p34
+
+and the optional fifth wire is confirmed too — ELITE-S p18: the **`LIN`** terminal is a
+*listen-in* line carrying call-progress audio to the keypad (gated on program option
+`P175E 6E`). It is **not** part of the data bus, so a read-only tap ignores it.
+
+Program-mode entry, from ELITE-S p27 — note this is a **panel-wide** mode, not per-keypad:
+
+```
+<PROGRAM> - <Installer Code> - <ENTER>        → the PROGRAM light FLASHES
+Default installer code (address P25E1E) = 000000
+```
+
+Two corrections to what was previously recorded here from web snippets:
+
+- **There is no `IPGM` display.** The string appears **zero times** in either manual; entry is
+  signalled by the *Program LED flashing*. (LCD keypads show menu headings such as
+  `INSTALLER:USERS` instead — ELITE-S p29.)
+- **Exit is not a two-key `<PROG> <ENTER>`.** On an LCD keypad you *repeatedly* press
+  `<PROG>` until the display reads `<ENTER> TO EXIT`, then press `<ENTER>`. Local (per-keypad)
+  Program Mode is a different thing again, exited by holding `<PROGRAM>` for two seconds.
+
+One operational constraint worth knowing before bench work: **"Program mode access is
+inhibited if any part of the system is Armed"** (ELITE-S p27).
+
+> **Still missing:** the RS232-BD *keypad* instruction sheet on `manuals.plus` — that host
+> returns **HTTP 403** to non-browser clients, so it needs a manual save from a browser. Low
+> value now: ELITE-S p18 already documents the 5-wire keypad port it was wanted for, and the
+> board's RS232 side is fully covered by [`rs232-protocol.md`](rs232-protocol.md).
 
 ## How the official path works (the board we're avoiding)
 The **RS232-BD** is a small board that:
@@ -71,7 +115,7 @@ SmartHome stack member.
 - **[thanoskas/arrowhead_alarm](https://github.com/thanoskas/arrowhead_alarm)** — TCP "Serial-over-IP", **ECi-series only** now (v1.x did ESX Elite-SX, unmaintained). Not ESL-2, but a reference HA entity/state model.
 - **[ankohanse/hass-elite-cloud](https://github.com/ankohanse/hass-elite-cloud)** — ESL-2 via **Elite Cloud** (cloud — avoid).
 
-**Manuals / community:** [RS232-BD (manuals.plus)](https://manuals.plus/arrowhead-alarm/rs232-bd-elite-s-keypad-manual) · [ESL-2 install/programming (ManualsLib)](https://www.manualslib.com/manual/2040574/Arrowhead-Alarm-Products-Esl-2.html) · [HA forum — EliteControl NZ](https://community.home-assistant.io/t/question-about-integrating-elitecontrol-alarm-system-into-home-assistant-nz-company/402663) · [HA forum — Crow ESP8266 interface](https://community.home-assistant.io/t/crow-runner-alarm-interface-using-an-esp8266-and-home-assistant/629939) · [Geekzone — Arrowhead HomeKit](https://www.geekzone.co.nz/forums.asp?forumid=73&topicid=306147).
+**Manuals / community:** [RS232-BD (manuals.plus)](https://manuals.plus/arrowhead-alarm/rs232-bd-elite-s-keypad-manual) (403s to non-browsers) · [ESL-2 install/programming (ManualsLib)](https://www.manualslib.com/manual/2040574/Arrowhead-Alarm-Products-Esl-2.html) — now held locally, see [What we have](#what-we-have) · [HA forum — EliteControl NZ](https://community.home-assistant.io/t/question-about-integrating-elitecontrol-alarm-system-into-home-assistant-nz-company/402663) · [HA forum — Crow ESP8266 interface](https://community.home-assistant.io/t/crow-runner-alarm-interface-using-an-esp8266-and-home-assistant/629939) · [Geekzone — Arrowhead HomeKit](https://www.geekzone.co.nz/forums.asp?forumid=73&topicid=306147).
 
 ## Next steps
 1. **Read `MadDoct/ESP-CrowAlarmInterface` + `sivann/crowalarm` source** end-to-end; lift the CLK/DAT decode + wiring.
