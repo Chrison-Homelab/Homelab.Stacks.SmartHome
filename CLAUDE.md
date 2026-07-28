@@ -31,11 +31,17 @@ rather than HA itself.
 | 6001 | `matter-server` | Host-net + Thread/BLE |
 | 6002 | `aircast` | Host-net for mDNS/RTP |
 | 6003 | `esphome` | ESPHome dashboard |
-| **4100** | `leapmotor-mate` | ⚠️ **Adopted in-place, OUT-OF-BLOCK** — live at 4100, kept to avoid a redeploy |
-| **2000** | `homeassistant` | ⚠️ **Adopted, describe-only** VM — predates this stack; never re-provisioned by `converge --apply` |
+| **4100** | `leapmotor-mate` | ⚠️ **Adopted in-place, OUT-OF-BLOCK** — live at 4100, kept to avoid a redeploy. **Now stopped and tagged `retired`** — Mate runs on the podman host (`podman-host/quadlets/leapmotor-mate.container`), so this shape is dead weight pending the CT's deletion |
+| **2000** | `homeassistant` | ⚠️ **Adopted — `manage: describe-only`** VM; predates this stack and is never written by converge |
 
 **The two out-of-block members are deliberate, documented exceptions.** Do not "fix" their IDs —
-renumbering means recreating the guest. Treat VM 2000 as read-only.
+renumbering means recreating the guest.
+
+VM 2000 carries **`spec.manage: describe-only`** (#325), so "treat it as read-only" is now enforced
+by the engine rather than by this sentence: plan reports it as `DESCRIBE-ONLY` instead of perpetual
+drift, `--apply` reports `SKIPPED`, and **naming it in `--only` does not override that**. Before the
+marker existed, an unscoped `converge --apply` on this stack proposed a `SetConfig` against an
+adopted HAOS install, and the only thing stopping it was remembering to scope the run.
 
 ## Working here
 
