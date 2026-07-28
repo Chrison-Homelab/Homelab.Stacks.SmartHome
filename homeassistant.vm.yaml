@@ -40,6 +40,20 @@ spec:
   vmid: 2000              # ADOPTED — existing homeassistant VM; do not allocate fresh.
   name: homeassistant
 
+  # NEVER WRITTEN BY CONVERGE — enforced, not merely documented (#325).
+  #
+  # This file describes a hand-built HAOS install that predates the stack, so its live
+  # config can never fully match the shape. Without this marker converge read that
+  # difference as drift on every single run, and an unscoped `--apply` proposed a
+  # `SetConfig` against it. The README and stack.yaml have always said "describe-only",
+  # but that was prose: the only thing actually preventing a write was the operator
+  # remembering to pass `--only`. Now the plan reports DESCRIBE-ONLY instead of drift and
+  # apply reports SKIPPED — and naming it in `--only` does not override either. (Destroy
+  # was never a risk for this member: `converge --destroy` is CT-scoped and does not touch
+  # VM members at all. The same marker DOES make destroy refuse a describe-only LXC.)
+  # Everything below stays descriptive — it documents reality.
+  manage: describe-only
+
   machine: q35
   bios: ovmf              # UEFI (pairs with the efidisk below)
   cores: 2
