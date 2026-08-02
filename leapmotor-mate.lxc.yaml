@@ -36,6 +36,13 @@ metadata:
   tags: [leapmotor, car, ev, docker, retired]   # RETIRED — replaced by CT 6004 (SmartHome podman host), #285
 
 spec:
+  # RETIRED — Mate runs on CT 6004 (SmartHome podman host) as a quadlet, #285. CT 4100 is
+  # already deleted, which is the dangerous state rather than the safe one: absent looked
+  # identical to never-created, so the next full converge of this stack would have rebuilt
+  # it. That is exactly what happened to Media's CT 5113 (#362) — a `retired` tag and a
+  # comment stopped nothing, because the engine read neither. Converge now refuses to
+  # create or write this member, and `--only` cannot override it.
+  manage: retired
   app: docker            # community-scripts slug → ct/docker.sh (Docker Engine host)
   ctid: 4100             # ADOPTED IN-PLACE, out-of-block: SmartHome's range is 6000–6099, but this CT
                          # is already live at 4100 — kept to avoid a redeploy. Documented exception,
