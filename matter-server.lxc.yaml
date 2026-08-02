@@ -22,6 +22,21 @@
 # fabric (to keep devices paired) = copy its matter storage into ./data — see
 # README ("Matter fabric migration"). Fresh start = re-commission the devices.
 #
+# ✅ HA ACTUALLY POINTS HERE AS OF 2026-08-02 (#250). Until then it did not: HA's
+# Matter config entry still read `ws://core-matter-server:5580/ws` — the add-on
+# INSIDE HAOS — and this CT sat running with ZERO established connections on :5580.
+# The extraction had been written up as done but never took effect, which would have
+# silently lost Matter on any HA container migration. Now `ws://10.40.62.181:5580/ws`,
+# verified by two established sessions from HA's IoT leg (10.40.0.20).
+#
+# No fabric migration was needed — both sides were empty (0 commissioned nodes, 0
+# Matter entities in HA), so this was a clean repoint rather than the copy-the-storage
+# dance above. That option still stands if devices are ever commissioned to the wrong one.
+#
+# ⚠️ The redundant add-on `app_core_matter_server` is STILL RUNNING inside HAOS and is
+# now unused. Leaving two Matter servers alive is exactly how the mix-up above happened;
+# it should be uninstalled once this has been trusted for a bit.
+#
 # EXPOSURE — INTERNAL-ONLY. Only HA (the WS client) talks to it. No tunnel.
 # Validate against ../../Infrastructure/schema/shape.schema.json.
 
