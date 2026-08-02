@@ -79,18 +79,37 @@ spec:
   # NOTE: converge maps only the single-NIC `network` sugar today — `networks[]`
   # is descriptive (not reconciled), which is exactly right for this describe-only
   # adopted VM. It documents reality without the engine trying to manage the NICs.
+  # TRI-HOMED as of 2026-08-02 (#339). net1 and net2 were provisioned-but-link_down for
+  # exactly this; they are now up, each on a DHCP reservation.
+  #
+  # The point of the split: HA reaches every IoT device over net1 at LAYER 2 — same subnet,
+  # no gateway, no firewall zone crossed — while everything reaches HA over net2 on the
+  # Homelab VLAN. That is what makes full IoT isolation possible: the `Homelab -> IOT` zone
+  # pair is BLOCK (only a predefined return rule), so a single-homed HA on 1010 would have
+  # needed a new allow-all rule punched through. Tri-homing needs no firewall change at all.
+  #
+  # net1 carries NO DEFAULT ROUTE (`nmcli con mod "Supervisor enp6s19" ipv4.never-default
+  # yes`) — it is device-facing only. Without that it is luck: NetworkManager happened to
+  # assign it metric 20102, but a reconnect could recompute.
   networks:
     - bridge: vmbr0                     # net0 — untagged/native → guest enp6s18
-      hwaddr: "02:1F:98:8B:6F:6A"       #        ACTIVE, legacy net 192.168.179.102 (HA reaches the broker here)
+      hwaddr: "02:1F:98:8B:6F:6A"       #        ACTIVE, legacy 192.168.179.102 — default route, metric 100.
+                                        #        STILL PRIMARY; retiring it is the rest of #339 (see below).
     - bridge: vmbr0                     # net1 — IoT VLAN → guest enp6s19
-      hwaddr: "BC:24:11:C0:7F:BB"       #        for future HA↔IoT-device L2 comms; NOT needed for MQTT
-      tag: 1040
-      firewall: true
-      linkDown: true                    #        administratively DOWN + unconfigured inside HAOS
+      hwaddr: "BC:24:11:C0:7F:BB"       #        ACTIVE, 10.40.0.20 (reserved). L2 path to the Zigbee gateway
+      tag: 1040                         #        (10.40.0.21), Mosquitto (10.40.26.247) and Matter (10.40.62.181).
+      firewall: true                    #        never-default: no default route via this leg.
     - bridge: vmbr0                     # net2 — Homelab VLAN → guest enp6s20
-      hwaddr: "BC:24:11:3C:03:54"
-      tag: 1010
+      hwaddr: "BC:24:11:3C:03:54"       #        ACTIVE, 10.10.0.20 (reserved). Default route metric 101.
+      tag: 1010                         #        Pangolin reaches HA here once net0 goes.
       firewall: true
-      linkDown: true                    #        administratively DOWN
+  # ⚠ RETIRING net0 (the remainder of #339) is NOT just deleting the NIC:
+  #   1. `homeassistant.homelab.chrison.internal` is attached to a reservation keyed on
+  #      net0's MAC (02:1F:98:8B:6F:6A). Re-key it to BC:24:11:3C:03:54 or the name — which
+  #      the Pangolin resource now targets — stops resolving.
+  #   2. net0 currently holds the metric-100 default route. enp6s20 must become primary
+  #      first, or HA loses egress.
+  #   3. Only then can the custom `Internal -> IOT` allow be reconsidered, which is what
+  #      "fully isolate IoT" actually requires.
 
   tags: [hpe-01, smart-home, vlan-1010, vlan-1040]   # preserve the existing Proxmox tags
