@@ -126,16 +126,51 @@ seeds the VM with community-scripts `vm/haos-vm.sh` (downloads + imports the HAO
 qcow2); this shape documents the sizing/firmware to match, and HA's own
 config/state restores from an **HA backup** (not from this shape).
 
-## Deploying
+## Build & release (this repo)
+
+This stack owns its own Fallout pipeline. `./build.sh` **here** validates and packages —
+it does not deploy; see [Deploying](#deploying) for that.
 
 ```bash
+./build.sh                              # ValidateShapes — the same engine `validate` the superproject runs
+./build.sh Bundle                       # + dist/smarthome-<version>.tar.gz and a manifest
+./build.sh Release --dry-run            # + resolve the version, without publishing
+./build.sh Bundle --skip ValidateShapes # macOS/Windows: the portable validator is linux-x64 only
+```
+
+Fallout 10.4 is public on nuget.org, so nothing here needs a package-feed PAT. The one
+credential is **`SCHEMA_RO_PAT`** (`contents:read` on the private superproject), used to
+download the portable validator from its `schema-v1` release.
+
+**Releases are the deploy unit.** A merge to `main` that changes a shape or a service asset
+cuts a GitHub Release: the bundle plus a `MANIFEST.md` recording the commit, the build time,
+and every member's ID and lifecycle. A deploy resolves the tag to that bundle, so what was
+validated is what ships. Docs-only merges don't release — the artifact would be identical.
+
+Versions are **SemVer derived from the labels on the PRs merged since the last tag**:
+
+| Label on any merged PR | Bump | What it means here |
+|---|---|---|
+| `breaking-change` | major | a member's `ctid`, or anything that forces recreating a guest |
+| `enhancement` | minor | a new member or capability |
+| anything else | patch | fixes, dependencies, housekeeping |
+
+So the label set at PR-creation time decides the version; a PR merged without one is a patch
+bump and lands under "Other Changes". See [`.github/release.yml`](.github/release.yml).
+
+## Deploying
+
+Converge runs **from the superproject**, which owns the engine and the cluster credentials
+(Proxmox API + SSH to the nodes, on the self-hosted runner):
+
+```bash
+# in Chrison-Homelab/Homelab
 ./build.sh Preview --stack SmartHome   # dry-run (read-only)
 ./build.sh Deploy  --stack SmartHome   # apply — creates/updates LXC members
 ```
 
-> ⚠️ Until a `managed:false` exclude flag exists, `Deploy` includes the adopted
-> HA VM. Its plan is cosmetic-only today (tags/agent), but treat HA as
-> **describe-only** and don't apply it deliberately.
+> The adopted HA VM (2000) carries `manage: describe-only`, so `Deploy` reports it as
+> DESCRIBE-ONLY and skips it — naming it in `--only` does not override that (#325).
 
 ## Files
 
@@ -147,3 +182,6 @@ config/state restores from an **HA backup** (not from this shape).
 | `leapmotor-mate.lxc.yaml` | Adopted Docker-host LXC (CT 4100, out-of-block) — the C10 companion. |
 | `leapmotor-mate/` | Its compose + certs + `.env.example` + service README. |
 | `homeassistant.vm.yaml` | Adopted HAOS VM (2000) — describe-only. |
+| `build/Build.cs` · `build.sh` · `build.ps1` | This stack's Fallout pipeline — validate, bundle, release. |
+| `.github/release.yml` | Label taxonomy. Drives the generated notes **and** the version bump. |
+| `.github/workflows/build.yml` · `release.yml` | PR gate, and the `Production` release. |

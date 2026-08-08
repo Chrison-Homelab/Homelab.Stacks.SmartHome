@@ -1,0 +1,39 @@
+# Source of truth for this repo's PR label taxonomy, and what `gh release create
+# --generate-notes` groups the notes by. Mirrors the superproject's
+# .github/release.yml so a contributor moving between the two doesn't have to relearn it —
+# see Chrison-Homelab/Homelab docs/agents/issue-and-pr-style.md.
+#
+# UNLIKE the superproject, these labels are load-bearing here: build/Build.cs derives the
+# release version from them (breaking-change → major, enhancement → minor, else patch). A
+# PR merged without a category label produces a patch bump and lands under "Other Changes".
+changelog:
+  exclude:
+    labels:
+      # Housekeeping and version bumps stay out of the notes. Note they still count toward
+      # the version — an excluded PR is a patch bump, not a no-op.
+      - skip-changelog
+      - dependencies
+    authors:
+      - dependabot
+  categories:
+    # breaking-change: removes or renames something a consumer depends on. Here that means
+    # a member's ctid, or anything that forces recreating a guest rather than updating it.
+    - title: "⚠️ Breaking Changes"
+      labels:
+        - breaking-change
+    - title: "✨ New Features"
+      labels:
+        - enhancement
+    - title: "🐛 Bug Fixes"
+      labels:
+        - bug
+    - title: "🔒 Security"
+      labels:
+        - security
+    - title: "📦 Dependencies"
+      labels:
+        - dependencies
+    - title: "📖 Documentation"
+      labels:
+        - documentation
+    - title: "Other Changes"
