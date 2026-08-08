@@ -75,6 +75,33 @@ drift, `--apply` reports `SKIPPED`, and **naming it in `--only` does not overrid
 marker existed, an unscoped `converge --apply` on this stack proposed a `SetConfig` against an
 adopted HAOS install, and the only thing stopping it was remembering to scope the run.
 
+## Build & release
+
+This repo has its own **Fallout 10.4** pipeline (`build/Build.cs`). Fallout 10.4 is public on
+nuget.org, so there is no package-feed PAT here — unlike the superproject, which is still pinned
+to the abandoned `2026.1.0-preview` edge line on GitHub Packages.
+
+```bash
+./build.sh                              # ValidateShapes (default)
+./build.sh Bundle                       # + dist/ artifact + MANIFEST.md
+./build.sh Release --dry-run            # + version resolution, no publish
+./build.sh Bundle --skip ValidateShapes # macOS/Windows — the portable validator is linux-x64 only
+```
+
+Three things to know before touching it:
+
+- **`./build.sh` in this repo does not deploy.** It validates and packages. Converge needs the
+  engine and cluster credentials, which stay in the superproject (see below). A `Deploy` target is
+  expected later; the seam is the `Engine(...)` helper, which already runs the portable binary.
+- **The PR label decides the version.** `build/Build.cs` reads the labels on every PR merged since
+  the last tag: `breaking-change` → major, `enhancement` → minor, else patch. A label is no longer
+  just changelog dressing — mislabel a `ctid` change as `enhancement` and the release understates
+  that guests get recreated.
+- **Two `gh` calls need two different tokens.** Downloading the validator reads the *private
+  superproject* (`SCHEMA_RO_PAT`); resolving PR labels and creating the release read *this* repo
+  (the ambient Actions token). The schema token is scoped to that one process rather than exported
+  across the run — don't "simplify" it into a single global `GH_TOKEN`.
+
 ## Working here
 
 Converge runs **from the superproject**, pointed at this directory — never from inside this repo:
