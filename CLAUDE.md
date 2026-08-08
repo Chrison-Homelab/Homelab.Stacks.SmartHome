@@ -15,6 +15,38 @@ thing that applies them.
 > external-account guardrails (**add-only** — never touch Cloudflare/UniFi resources we didn't
 > create), and `secrets.env` / Bitwarden Secrets Manager handling.
 
+## Tracking
+
+Issues for this stack live in **this repo's tracker**. The superproject keeps cross-repo epics and
+anything that changes the engine.
+
+- **File stack-local work here.** Shapes, members, device wiring, stack docs.
+- **File engine work in the superproject.** A story that needs converge to learn something new —
+  for example [Homelab#383](https://github.com/Chrison-Homelab/Homelab/issues/383) (reconcile
+  multi-NIC `networks[]`) — goes there and gets linked, because the engine is not in this repo.
+- **Labels mirror the superproject taxonomy.** Apply one category label at creation time, per the
+  superproject's [`docs/agents/issue-and-pr-style.md`](https://github.com/Chrison-Homelab/Homelab/blob/main/docs/agents/issue-and-pr-style.md).
+  That file also defines the issue shape (`### Problem` / `### Outcome` / `### Acceptance criteria`).
+
+### Home Assistant milestone
+
+The **Home Assistant** milestone tracks moving HA off the adopted HAOS VM 2000 onto a
+converge-managed container LXC (CT 6005). The cross-repo epic is
+[Homelab#250](https://github.com/Chrison-Homelab/Homelab/issues/250) and every story is attached to
+it as a sub-issue, so the epic shows progress across both repos.
+
+Two things to know before picking up any of it:
+
+- **The critical path is the engine, not the shape.** `spec.networks[]` is descriptive for every
+  guest kind today (`VmConverger.cs:56`, `CtConfigReconciler.cs:11`, and the community-scripts
+  create path emits one `var_vlan`), so the dual-homed LXC the migration calls for cannot be
+  converged until Homelab#383 lands. Building it by hand would recreate the drift this migration
+  exists to remove.
+- **Do not size CT 6005 from the numbers in Homelab#250.** They were measured at 2 cores / 2 GB.
+  VM 2000 was raised to 4 cores / 4 GB on 2026-08-09 after HA pegged both cores and timed out
+  bootstrap, cancelling 14 integrations (Homelab#382). `homeassistant.vm.yaml` still records the
+  old figures and is drifted from live.
+
 ## This stack
 
 The home-automation / **IoT support layer** — the infrastructure that feeds Home Assistant,
