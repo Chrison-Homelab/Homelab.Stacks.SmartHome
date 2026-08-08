@@ -108,6 +108,13 @@ The broker's IP is **DHCP-reserved** (`10.40.26.247`) so clients have a stable a
 
 ## Home Assistant — adopted (describe-only)
 
+> **Being migrated to a container LXC.** VM 2000 → HA Container **CT 6005**, dual-homed on Homelab
+> 1010 with an IoT 1040 leg. Broken into stories under the [Home Assistant milestone](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/milestone/1);
+> the epic is [Homelab#250](https://github.com/Chrison-Homelab/Homelab/issues/250). Blocked on
+> [Homelab#383](https://github.com/Chrison-Homelab/Homelab/issues/383) (converge cannot build a
+> multi-NIC LXC yet). **Until that lands, VM 2000 is still the live hub** and everything below
+> still applies.
+
 [`homeassistant.vm.yaml`](homeassistant.vm.yaml) captures the live HAOS VM (VMID
 2000) so the stack is **reproducible**, but it is **not converged/applied** — HA
 is a stateful box we don't routinely reconcile, and multi-NIC converge isn't wired
