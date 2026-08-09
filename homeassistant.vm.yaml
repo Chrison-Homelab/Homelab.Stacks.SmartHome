@@ -52,7 +52,22 @@ spec:
   # was never a risk for this member: `converge --destroy` is CT-scoped and does not touch
   # VM members at all. The same marker DOES make destroy refuse a describe-only LXC.)
   # Everything below stays descriptive — it documents reality.
-  manage: describe-only
+  # RETIRED 2026-08-09 — superseded by homeassistant.lxc.yaml (CT 6005).
+  #
+  # `retired`, not `describe-only`: describe-only meant "adopted, documented, never written".
+  # This VM is now SUPERSEDED, and the distinction matters — `retired` makes converge refuse to
+  # recreate it even if someone names it in `--only`, which is exactly how CT 5113 came back
+  # months after it was retired (Homelab#362). A tag and a comment are not read by the engine.
+  #
+  # STOPPED, NOT DESTROYED. This is the rollback: if the container instance turns out to be
+  # missing something, `qm start 2000` brings the old house back. Destroy is deliberately a
+  # separate, later decision (#21) and needs a snapshot first — stopping does not, because it
+  # is reversible.
+  #
+  # ⚠️ DO NOT START IT ALONGSIDE CT 6005. Both instances talk to the same MQTT broker, the same
+  # Matter server and the same Zigbee coordinator. Two live Home Assistants sharing that
+  # infrastructure is what hid the duplicate Matter server for months.
+  manage: retired
 
   machine: q35
   bios: ovmf              # UEFI (pairs with the efidisk below)
@@ -60,7 +75,7 @@ spec:
   memory: 2048            # MB
   ostype: l26
   agent: true             # QEMU guest agent enabled
-  onboot: true
+  onboot: false          # retired — must not come back on a host reboot
 
   disks:
     - id: scsi0
