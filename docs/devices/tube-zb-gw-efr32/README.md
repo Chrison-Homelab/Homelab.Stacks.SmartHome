@@ -112,7 +112,43 @@ Two failure modes seen:
    **Passive BLE Monitor integration isn't actually configured/loaded** (files present in
    `custom_components/ble_monitor` ≠ a working integration).
 
-**Current state: `Esp_Bluetooth` is OFF and should stay off.** The BLE-gateway hack is a
+> ### Update 2026-08-09 (CT 6005) — the switch is now **ON**, deliberately, with the noise suppressed
+>
+> This section was written for HAOS VM 2000 and its advice was followed literally: the switch was
+> off. During the container migration it was turned **back on** without reading this page first —
+> which promptly reproduced failure mode 2 above. Recording what that turned up, because it changes
+> the conclusion rather than just confirming it.
+>
+> **The firmware runs BOTH BLE paths at once**, and only one is bad:
+>
+> | Path | Verdict |
+> |---|---|
+> | ESPHome **`bluetooth_proxy`** → HA's native `bluetooth` → `bthome` | ✅ **works, and we want it** — it is how the pvvx/BTHome Xiaomi sensors reach HA |
+> | `on_ble_advertise` → **`ble_monitor.parse_data`** | ❌ legacy, always fails, floods the log |
+>
+> So "turn the switch off" also turns off the *good* path. That is why the Xiaomi sensors were dead:
+> `sensor.atc_09c0_temperature` — the **primary** sensor for Karl's bedroom heating — only exists
+> when this switch is on.
+>
+> **Neither `allow_service_calls` setting is quiet**, so the ESPHome repair warning cannot be
+> resolved by granting the permission. Leave it **OFF** and dismiss the repair.
+>
+> **Measured cost of the flood:** ~145 errors/sec ≈ **5 GB of container log per day**. CT 6005's
+> docker `json-file` logging had **no rotation**; the log had already reached **1.3 GB**.
+>
+> **Mitigation applied** — BLE kept, noise gone:
+> 1. `configuration.yaml`: `logger: logs: homeassistant.components.esphome.manager: fatal`
+> 2. truncated the 1.3 GB log; set `/etc/docker/daemon.json` to `max-size: 20m, max-file: 3`
+>    (existing containers keep their own config — this only helps future ones)
+>
+> **Do NOT "just install `ble_monitor`"** to silence it. It would work, but it creates a second set
+> of entities for sensors HA already reports natively via `bthome` — duplicate sources for one
+> physical device, which is how the duplicate Matter server hid for months.
+>
+> **The real fix is firmware**: remove the `on_ble_advertise` block. The ESP32 is reflashable and
+> CT 6003 runs an ESPHome dashboard — fold it into the XZG reflash, Homelab#259.
+
+**Historical state (VM 2000): `Esp_Bluetooth` was OFF and was to stay off.** The BLE-gateway hack is a
 poor fit for a 2 GB HAOS box. Do BLE the clean way instead — a dedicated **ESP32
 `bluetooth_proxy`** (see [`../../esp-fleet.md`](../../esp-fleet.md) and
 [`../xiaomi-lywsd03mmc/`](../xiaomi-lywsd03mmc/)). Turn the switch off via the gateway web UI,
