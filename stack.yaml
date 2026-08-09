@@ -1,7 +1,9 @@
 # SmartHome stack — the home-automation / IoT support layer.
 #
-# Home Assistant itself already runs as a hand-built HAOS VM (VMID 2000). This
-# stack is the *supporting infrastructure* that feeds it: an MQTT broker today,
+# Home Assistant IS a member of this stack as of 2026-08-09 — CT 6005, HA Container
+# (see homeassistant.lxc.yaml). The hand-built HAOS VM 2000 it replaced is retired and
+# stopped, kept only as a rollback. Alongside HA this stack carries the *supporting
+# infrastructure* that feeds it: an MQTT broker,
 # with room to grow (zigbee2mqtt, node-red, esphome, zwave-js-ui, frigate, …) as
 # the need arises — each a new member dropped into this same stack + broker.
 #
@@ -12,20 +14,22 @@
 #     Leapmotor C10 companion; publishes state + HA-discovery to the mqtt broker
 #     above. ADOPTED IN-PLACE / out-of-block: it's live at 4100 (outside 6000–6099)
 #     and kept there to avoid a redeploy — a documented exception like the HA VM.
-#   - homeassistant — VMID 2000, ADOPTED (see homeassistant.vm.yaml). Legacy-
-#     numbered, describe-only; it predates this stack and its number sits far
-#     from the 6000 block, so it's an explicit out-of-range adopted member (like
-#     the Gaming stack's adopted VMs). Never re-provisioned by converge --apply.
+#   - homeassistant — CT 6005, the hub (see homeassistant.lxc.yaml). HA Container
+#     via community-scripts; dual-homed Homelab 1010 (primary) + IoT 1040 leg.
+#   - homeassistant — VMID 2000, RETIRED (see homeassistant.vm.yaml). The old HAOS
+#     VM this stack used to merely feed. Stopped, onboot false, manage: retired;
+#     kept only as a rollback. NEVER run it alongside CT 6005 — they share the
+#     broker, the Matter server and the Zigbee coordinator.
 #
 # EXPOSURE — INTERNAL-ONLY. MQTT is never exposed publicly. The broker lives on
-# the IoT VLAN (1040); clients on other VLANs (Mate on Homelab 1010, HA on the
-# legacy net) reach it via inter-VLAN routing (+ firewall allowances as needed).
+# the IoT VLAN (1040). HA (CT 6005) reaches it at LAYER 2 over its IoT leg — no
+# gateway, no firewall zone crossed — which is why `Homelab -> IOT` can stay BLOCK.
 #
 # Deployed via the Fallout pipeline → engine converge (../../Infrastructure).
 # Validate members against ../../Infrastructure/schema/shape.schema.json.
 #
 # CTID allocation policy: LXC members set ctid EXPLICITLY within the block below.
-# The adopted HA VM (2000) is the documented exception (legacy number, describe-only).
+# The retired HA VM (2000) is the documented exception (legacy number, manage: retired).
 
 apiVersion: homelab/v1
 kind: Stack
