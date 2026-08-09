@@ -64,43 +64,25 @@ rather than HA itself.
 | 6002 | `aircast` | Host-net for mDNS/RTP |
 | 6003 | `esphome` | ESPHome dashboard |
 | **4100** | `leapmotor-mate` | ⚠️ **Adopted in-place, OUT-OF-BLOCK** — live at 4100, kept to avoid a redeploy. **Now stopped and tagged `retired`** — Mate runs on the podman host (`podman-host/quadlets/leapmotor-mate.container`), so this shape is dead weight pending the CT's deletion |
-| **2000** | `homeassistant` | ⚠️ **Adopted — `manage: describe-only`** VM; predates this stack and is never written by converge |
+| 6005 | `homeassistant` | **The hub.** HA Container, dual-homed Homelab 1010 + IoT 1040 leg |
+| **2000** | `homeassistant` | ⛔ **RETIRED** — the old HAOS VM, stopped with `onboot: false` and `manage: retired`. Kept only as the rollback; never start it alongside CT 6005 |
 
 **The two out-of-block members are deliberate, documented exceptions.** Do not "fix" their IDs —
 renumbering means recreating the guest.
 
-VM 2000 carries **`spec.manage: describe-only`** (#325), so "treat it as read-only" is now enforced
-by the engine rather than by this sentence: plan reports it as `DESCRIBE-ONLY` instead of perpetual
-drift, `--apply` reports `SKIPPED`, and **naming it in `--only` does not override that**. Before the
-marker existed, an unscoped `converge --apply` on this stack proposed a `SetConfig` against an
-adopted HAOS install, and the only thing stopping it was remembering to scope the run.
+VM 2000 is now **`spec.manage: retired`** (was `describe-only` until 2026-08-09). `retired` is
+stronger and load-bearing: converge never creates or writes it, **`--only` cannot override that**,
+and plan flags it if the guest still exists. A `retired` tag plus a comment does none of that — the
+engine reads neither, which is how CT 5113 was rebuilt months after retirement (superproject #362).
 
-## Build & release
+⚠️ **Never run VM 2000 and CT 6005 at the same time.** They share the MQTT broker, the Matter server
+and the Zigbee coordinator. Two live Home Assistants on that infrastructure is exactly what hid a
+duplicate Matter server for months.
 
-This repo has its own **Fallout 10.4** pipeline (`build/Build.cs`). Fallout 10.4 is public on
-nuget.org, so there is no package-feed PAT here — unlike the superproject, which is still pinned
-to the abandoned `2026.1.0-preview` edge line on GitHub Packages.
-
-```bash
-./build.sh                              # ValidateShapes (default)
-./build.sh Bundle                       # + dist/ artifact + MANIFEST.md
-./build.sh Release --dry-run            # + version resolution, no publish
-./build.sh Bundle --skip ValidateShapes # macOS/Windows — the portable validator is linux-x64 only
-```
-
-Three things to know before touching it:
-
-- **`./build.sh` in this repo does not deploy.** It validates and packages. Converge needs the
-  engine and cluster credentials, which stay in the superproject (see below). A `Deploy` target is
-  expected later; the seam is the `Engine(...)` helper, which already runs the portable binary.
-- **The PR label decides the version.** `build/Build.cs` reads the labels on every PR merged since
-  the last tag: `breaking-change` → major, `enhancement` → minor, else patch. A label is no longer
-  just changelog dressing — mislabel a `ctid` change as `enhancement` and the release understates
-  that guests get recreated.
-- **Two `gh` calls need two different tokens.** Downloading the validator reads the *private
-  superproject* (`SCHEMA_RO_PAT`); resolving PR labels and creating the release read *this* repo
-  (the ambient Actions token). The schema token is scoped to that one process rather than exported
-  across the run — don't "simplify" it into a single global `GH_TOKEN`.
+**HA's `.storage` is not captured by the shape** — config entries and their credentials, the
+floor/area registry, the ZHA device database, HACS and anything installed through it. A rebuild of
+CT 6005 returns a stock Home Assistant. Tracked in #27, **blocked** on a secrets decision because
+that state includes live credentials and the Zigbee network key.
 
 ## Working here
 

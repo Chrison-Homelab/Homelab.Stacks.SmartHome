@@ -16,9 +16,12 @@ flowchart LR
   MATE["🚗 Leapmotor Mate<br/>CT 4100"] -->|publish| BROKER
   ESP["📟 ESPHome<br/>CT 6003"] -->|publish| BROKER
   BROKER["📮 Mosquitto broker<br/>CT 6000 · 10.40.26.247<br/>auth + HA-discovery"]
-  BROKER <-->|"pub/sub + discovery"| HA["🏠 Home Assistant<br/>VM 2000 (adopted)"]
+  BROKER <-->|"pub/sub + discovery"| HA
   MATTER["🔌 matter-server<br/>CT 6001"] -. "WebSocket" .-> HA
+  ZBGW["📡 Zigbee gateway<br/>10.40.0.21 · EZSP + BLE proxy"] -. "ZHA + BLE" .-> HA
   AIR["📺 aircast<br/>CT 6002 · AirPlay"]
+  HA["🏠 Home Assistant<br/>CT 6005 · 10.10.0.21<br/>Homelab 1010 + IoT leg"]
+  PANG["🔐 Pangolin<br/>SSO ingress"] -->|homeassistant.iot.chrison.dev| HA
 
   subgraph IOT["IoT VLAN 1040"]
     MATE
@@ -26,6 +29,7 @@ flowchart LR
     BROKER
     MATTER
     AIR
+    ZBGW
   end
   classDef bus fill:#dbeafe,stroke:#2563eb;
   class BROKER bus;
@@ -34,8 +38,8 @@ flowchart LR
 ## Members
 
 CTID block **6000–6099** for LXC members (declared in [`stack.yaml`](stack.yaml)).
-Home Assistant (VMID 2000) and Leapmotor Mate (CT 4100) are **adopted, out-of-block
-members** kept at their live IDs — see below.
+Home Assistant moved **into** the block on 2026-08-09 (CT 6005) — the retired HAOS VM 2000 and
+Leapmotor Mate (CT 4100) are the remaining out-of-block entries, both superseded.
 
 | ID | Member | Kind | Net | Role | Status |
 |----|--------|------|-----|------|--------|
@@ -44,9 +48,9 @@ members** kept at their live IDs — see below.
 | 6002 | [aircast](aircast.lxc.yaml) | Docker host | IoT 1040 · `10.40.147.133` | Chromecast→AirPlay bridge (ex-HA add-on) | ✅ live |
 | 6003 | [esphome](esphome.lxc.yaml) | LXC (native) | IoT 1040 · `10.40.60.203` (reserved) | ESP firmware dashboard/builder (ex-HA add-on) | ✅ live (#251) |
 | 6004 | [podman-host](podman-host.lxc.yaml) | LXC (rootless Podman) | IoT 1040 | Quadlet host — runs Leapmotor Mate (ADR-0009) | ✅ live |
-| 6005 | [homeassistant](homeassistant.lxc.yaml) | Docker host (HA Container) | Homelab 1010 **+** IoT 1040 | **The hub** — replaces VM 2000 | 📐 shape authored, not yet created |
+| 6005 | [homeassistant](homeassistant.lxc.yaml) | Docker host (HA Container) | Homelab 1010 **+** IoT 1040 | **The hub** | ✅ **live** — replaced VM 2000 |
 | 4100 | [leapmotor-mate](leapmotor-mate.lxc.yaml) | Docker host | IoT 1040 · `10.40.169.225` (reserved) | Leapmotor C10 companion → publishes to the broker | 🔎 **adopted in-place, out-of-block** |
-| 2000 | [homeassistant](homeassistant.vm.yaml) | VM (HAOS) | legacy `192.168.179.102` (+ 1010/1040 legs) | The hub — **being retired** | 🔎 **adopted, describe-only** |
+| 2000 | [homeassistant](homeassistant.vm.yaml) | VM (HAOS) | legacy `192.168.179.102` | Former hub | ⛔ **retired** — stopped, `onboot: false`, kept as rollback |
 
 ## Extracted-from-HA members (matter-server, aircast)
 
@@ -108,34 +112,65 @@ The broker's IP is **DHCP-reserved** (`10.40.26.247`) so clients have a stable a
 > future L2 chatter with IoT devices. It's **not needed for MQTT** and is left
 > untouched — enabling it is a deliberate HAOS-side change, not done here.
 
-## Home Assistant — adopted (describe-only)
+## Home Assistant — CT 6005 (the hub)
 
-> **Being replaced by [`homeassistant.lxc.yaml`](homeassistant.lxc.yaml) (CT 6005)** — dual-homed
-> on Homelab 1010 with an IoT 1040 leg. Stories are under the
-> [Home Assistant milestone](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/milestone/1);
-> the epic is [Homelab#250](https://github.com/Chrison-Homelab/Homelab/issues/250). The multi-NIC
-> blocker is gone (Homelab#386). **VM 2000 is still the live hub until cutover**, so everything
-> below still applies.
->
-> Three decisions worth knowing before reading on:
-> - **From scratch, no backup restored.** VM 2000 has 75 config entries of which only 19 load, and
->   530 of its 701 entities are unavailable — mostly ghosts from the previous rental.
-> - **Every Zigbee device gets re-paired.** A fresh ZHA forms a new network. Both `zha` entries are
->   already `not_loaded` with 0 entities, so nothing working is lost — but it is a walk-around-the-
->   house job.
-> - **Hard cutover, not side-by-side.** Two live HA instances would share the MQTT broker and the
->   Zigbee coordinator.
+[`homeassistant.lxc.yaml`](homeassistant.lxc.yaml) — **HA Container** via community-scripts
+`ct/homeassistant.sh` (Docker on Debian 13 running `ghcr.io/home-assistant/home-assistant:stable`
+with `--net=host`). Migrated from the HAOS VM on **2026-08-09** (Homelab#250).
 
-[`homeassistant.vm.yaml`](homeassistant.vm.yaml) captures the live HAOS VM (VMID
-2000) so the stack is **reproducible**, but it is **not converged/applied** — HA
-is a stateful box we don't routinely reconcile, and multi-NIC converge isn't wired
-yet. `Preview` is read-only; the only drift it reports is cosmetic (Proxmox tags +
-an `agent` formatting no-op — no disk/net/memory changes).
+| | |
+|---|---|
+| Internal | `homeassistant.iot.chrison.internal` and `homeassistant.homelab.chrison.internal` → `10.10.0.21` |
+| External | `homeassistant.iot.chrison.dev` and `homeassistant.lab.chrison.dev` — Pangolin SSO |
+| Sizing | 4 cores / 4096 MB / 32 GB — **not** the script's 2/2048/16 default, which is the exact shape that timed out HA's bootstrap on the VM (Homelab#382) |
+| NICs | net0 Homelab 1010 `10.10.0.21` (default route) · net1 IoT 1040 `10.40.0.22` (device-facing, **no** default route) |
 
-**Redeploy-from-scratch seam:** HAOS ships as a disk image, so a fresh rebuild
-seeds the VM with community-scripts `vm/haos-vm.sh` (downloads + imports the HAOS
-qcow2); this shape documents the sizing/firmware to match, and HA's own
-config/state restores from an **HA backup** (not from this shape).
+**Updates are the community-scripts `update_script`** (docker pull + recreate), deliberately
+outside converge — that maintained upgrade path is the reason for using it. Converge owns the CT
+(size, NICs, lifecycle) and nothing inside it. No Supervisor, so **no add-on store and no
+HA-managed backup**.
+
+### Built from scratch, not restored
+
+Nothing was restored from VM 2000. It had 75 config entries of which only 19 loaded, and 530 of its
+701 entities were unavailable — mostly ghosts from the previous rental. CT 6005 runs 21 entries,
+all loaded. Discovery-based integrations repopulated themselves: MQTT came back with the same **81**
+entities without intervention.
+
+### Zigbee did NOT need re-pairing
+
+The plan assumed a full re-pair. It was wrong, and the correction is worth keeping: both `zha`
+entries on VM 2000 being `not_loaded` with 0 entities meant **nothing was connected to the
+coordinator**, not that the network was lost. ZHA's config flow offered `reuse_settings` — only
+shown when the radio's NVRAM holds an existing network — so CT 6005 **adopted** the live network
+(`pan_id F881`, channel 25). Sleepy battery devices still have to transmit once before ZHA
+re-interviews them, but no device was re-paired.
+
+**Probe the coordinator before assuming a Zigbee network is gone.** `not_loaded` is a client-side
+symptom.
+
+### Bluetooth comes from the Zigbee gateway
+
+The Xiaomi/BTHome sensors arrive over the gateway's ESPHome **`bluetooth_proxy`**, not a USB dongle
+— which is what makes running HA in an LXC viable at all. That same firmware also carries a legacy
+`ble_monitor` bridge that floods the log; see
+[`docs/devices/tube-zb-gw-efr32/`](docs/devices/tube-zb-gw-efr32/README.md) before touching the
+gateway's Bluetooth switch or the ESPHome `allow_service_calls` option.
+
+### The retired VM
+
+[`homeassistant.vm.yaml`](homeassistant.vm.yaml) is now `spec.manage: retired` with
+`onboot: false`, and VM 2000 is **stopped, not destroyed** — it is the rollback (`qm start 2000`).
+`retired` is load-bearing: converge refuses to recreate it even when named in `--only`, which a tag
+and a comment do not (Homelab#362). ⚠️ **Never run both** — they share the MQTT broker, the Matter
+server and the Zigbee coordinator.
+
+### What a rebuild does NOT restore
+
+The shape captures the container. It does **not** capture HA's `.storage`: config entries and their
+credentials, the floor/area registry, the ZHA device database, integration options, or anything
+installed through HACS. That gap is tracked in #27, which is **blocked** on deciding how secrets
+are handled — `.storage` holds live credentials and the Zigbee network key.
 
 ## Build & release (this repo)
 
@@ -180,8 +215,8 @@ Converge runs **from the superproject**, which owns the engine and the cluster c
 ./build.sh Deploy  --stack SmartHome   # apply — creates/updates LXC members
 ```
 
-> The adopted HA VM (2000) carries `manage: describe-only`, so `Deploy` reports it as
-> DESCRIBE-ONLY and skips it — naming it in `--only` does not override that (#325).
+> The retired HA VM (2000) carries `manage: retired`, so `Deploy` never writes or recreates it —
+> naming it in `--only` does not override that (#325, Homelab#362).
 
 ## Files
 
@@ -192,7 +227,8 @@ Converge runs **from the superproject**, which owns the engine and the cluster c
 | `matter-server.lxc.yaml` · `aircast.lxc.yaml` · `esphome.lxc.yaml` | The ex-HA-add-on members (CT 6001–6003). |
 | `leapmotor-mate.lxc.yaml` | Adopted Docker-host LXC (CT 4100, out-of-block) — the C10 companion. |
 | `leapmotor-mate/` | Its compose + certs + `.env.example` + service README. |
-| `homeassistant.vm.yaml` | Adopted HAOS VM (2000) — describe-only. |
+| `homeassistant.lxc.yaml` | **Home Assistant — CT 6005**, the hub. Dual-homed, converge-managed. |
+| `homeassistant.vm.yaml` | The retired HAOS VM (2000) — stopped, kept as the rollback. |
 | `build/Build.cs` · `build.sh` · `build.ps1` | This stack's Fallout pipeline — validate, bundle, release. |
 | `.github/release.yml` | Label taxonomy. Drives the generated notes **and** the version bump. |
 | `.github/workflows/build.yml` · `release.yml` | PR gate, and the `Production` release. |
