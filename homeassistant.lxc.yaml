@@ -1,0 +1,101 @@
+# Home Assistant — the hub itself, as a converge-managed LXC member (#250).
+#
+# REPLACES the adopted HAOS VM 2000 (homeassistant.vm.yaml, manage: describe-only).
+# This is a FROM-SCRATCH build, not a migration: no HA backup is restored. That is a
+# deliberate call — the live VM has 75 config entries of which only 19 load (46
+# not_loaded, 8 setup_error) and 530 of its 701 entities are unavailable, mostly ghosts
+# carried over from the previous rental. Restoring that state would import the mess.
+#
+# ⚠️ ZIGBEE IS THE ONE REAL COST. Both `zha` entries on VM 2000 are not_loaded with 0
+# entities, so nothing is being lost *today*, but a fresh ZHA forms a new network: every
+# Zigbee device has to be re-paired by hand. Accepted deliberately. Do not treat this as a
+# surprise on cutover night.
+#
+# CUTOVER IS A HARD SWITCH, not side-by-side: VM 2000 stops, CT 6005 comes up, and
+# integrations are re-added in one session. Two live HA instances would both talk to the
+# same MQTT broker and Zigbee coordinator — which is exactly how the duplicate Matter
+# server went unnoticed for months (#250).
+#
+# Validate against ../../Infrastructure/schema/shape.schema.json.
+
+apiVersion: homelab/v1
+kind: LXC
+
+metadata:
+  name: homeassistant
+  stack: SmartHome
+  tags: [smart-home, home-assistant, docker]
+  description: >-
+    Home Assistant Container on a community-scripts LXC. The smart-home hub: MQTT via
+    the broker (CT 6000), Matter via the standalone server (CT 6001), ESPHome via CT
+    6003, and Zigbee via the network coordinator on the IoT VLAN.
+
+spec:
+  ctid: 6005             # next free in the stack's 6000–6099 block
+  app: homeassistant     # community-scripts slug → ct/homeassistant.sh
+
+  # WHAT THAT SCRIPT ACTUALLY DOES (read it before changing anything here):
+  # installs Docker on Debian 13, then runs ghcr.io/home-assistant/home-assistant:stable
+  # with `--net=host --privileged -v hass_config:/config`. So this is HA **Container** —
+  # no Supervisor, no add-on store, no HA-managed backup/restore. It also installs
+  # Portainer unconditionally.
+  #
+  # Updates are the script's own `update_script` (docker pull + recreate), NOT converge.
+  # That is the point of using it: the upgrade path is maintained upstream for free.
+  # Converge owns the CT — size, NICs, lifecycle — and nothing inside it.
+
+  # Sized from the #382 incident, not from the script's defaults. ct/homeassistant.sh
+  # defaults to 2 CPU / 2048 MB / 16 GB — which is the exact shape that pegged both cores
+  # on VM 2000 and timed out bootstrap stage 2, cancelling 14 integrations mid-setup. HA's
+  # startup is CPU-bound (Python imports), so under-provisioning does not merely run slow,
+  # it fails to finish starting.
+  cores: 4
+  memory: 4096           # MB
+  disk: 32               # GB — Docker image layers + the recorder database, which grows
+
+  features:
+    nesting: true        # Docker-in-LXC
+    keyctl: true         # containerd keyring on an unprivileged LXC
+
+  # DUAL-HOMED, mirroring the tri-homed split #339 built for VM 2000 minus the legacy leg.
+  # The point: HA reaches IoT devices at LAYER 2 over net1 — same subnet, no gateway, no
+  # firewall zone crossed — while Pangolin and everything else reach HA over net0 on the
+  # Homelab VLAN. The `Homelab -> IOT` zone pair is BLOCK, so a single-homed HA on 1010
+  # would have needed a new allow-all rule punched through. This needs none.
+  #
+  # The HA container runs `--net=host`, so it sees both legs directly; nothing extra is
+  # needed inside Docker.
+  #
+  # ⚠️ Create provisions ONE NIC. community-scripts seeds net0 from networks[0]; net1 is
+  # added by converge's reconcile pass straight after (superproject #383/#386). This member
+  # is the first live exercise of that code — check `pct config 6005` after the first apply.
+  #
+  # No hwaddr pinned: Proxmox generates them and the reconciler carries the generated MAC
+  # forward on every later pass, so DHCP reservations stay valid. Reserve both addresses
+  # post-deploy, as every other member in this stack does.
+  networks:
+    - name: vlan1010     # net0 — Homelab VLAN. PRIMARY: default route, and how HA is reached.
+      bridge: vmbr0
+      tag: 1010
+      ip: dhcp           # DHCP-reserved post-deploy; the internal DNS name follows it (#20)
+      firewall: true
+    - name: vlan1040     # net1 — IoT VLAN. Device-facing only.
+      bridge: vmbr0
+      tag: 1040
+      ip: dhcp           # DHCP-reserved post-deploy
+      ip6: auto          # SLAAC on fd00:40::/64 — mDNS/HomeKit/Matter discovery is IPv6-first
+      firewall: true
+  # ⚠️ net1 MUST NOT carry a default route. On VM 2000 this needed an explicit
+  # `nmcli con mod <iface> ipv4.never-default yes`; without it the metric is luck — NM
+  # happened to pick a high one, but a reconnect can recompute. Proxmox cannot express
+  # this, so it is a guest-side post-deploy step, not something this shape can enforce.
+
+  onboot: true
+
+  # Converge ordering only — the broker and Matter server should exist before HA does.
+  # Neither is required for HA to *start*; both integrations retry.
+  dependsOn:
+    - mqtt
+    - matter-server
+
+  tags: [hpe-01, smart-home, home-assistant, vlan-1010, vlan-1040]
