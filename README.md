@@ -43,8 +43,10 @@ members** kept at their live IDs — see below.
 | 6001 | [matter-server](matter-server.lxc.yaml) | Docker host | IoT 1040 · `10.40.62.181` | Matter/Thread controller (ex-HA add-on) | ✅ live |
 | 6002 | [aircast](aircast.lxc.yaml) | Docker host | IoT 1040 · `10.40.147.133` | Chromecast→AirPlay bridge (ex-HA add-on) | ✅ live |
 | 6003 | [esphome](esphome.lxc.yaml) | LXC (native) | IoT 1040 · `10.40.60.203` (reserved) | ESP firmware dashboard/builder (ex-HA add-on) | ✅ live (#251) |
+| 6004 | [podman-host](podman-host.lxc.yaml) | LXC (rootless Podman) | IoT 1040 | Quadlet host — runs Leapmotor Mate (ADR-0009) | ✅ live |
+| 6005 | [homeassistant](homeassistant.lxc.yaml) | Docker host (HA Container) | Homelab 1010 **+** IoT 1040 | **The hub** — replaces VM 2000 | 📐 shape authored, not yet created |
 | 4100 | [leapmotor-mate](leapmotor-mate.lxc.yaml) | Docker host | IoT 1040 · `10.40.169.225` (reserved) | Leapmotor C10 companion → publishes to the broker | 🔎 **adopted in-place, out-of-block** |
-| 2000 | [homeassistant](homeassistant.vm.yaml) | VM (HAOS) | legacy `192.168.179.102` (+ idle IoT NIC) | The hub / consumer | 🔎 **adopted, describe-only** |
+| 2000 | [homeassistant](homeassistant.vm.yaml) | VM (HAOS) | legacy `192.168.179.102` (+ 1010/1040 legs) | The hub — **being retired** | 🔎 **adopted, describe-only** |
 
 ## Extracted-from-HA members (matter-server, aircast)
 
@@ -108,12 +110,21 @@ The broker's IP is **DHCP-reserved** (`10.40.26.247`) so clients have a stable a
 
 ## Home Assistant — adopted (describe-only)
 
-> **Being migrated to a container LXC.** VM 2000 → HA Container **CT 6005**, dual-homed on Homelab
-> 1010 with an IoT 1040 leg. Broken into stories under the [Home Assistant milestone](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/milestone/1);
-> the epic is [Homelab#250](https://github.com/Chrison-Homelab/Homelab/issues/250). Blocked on
-> [Homelab#383](https://github.com/Chrison-Homelab/Homelab/issues/383) (converge cannot build a
-> multi-NIC LXC yet). **Until that lands, VM 2000 is still the live hub** and everything below
-> still applies.
+> **Being replaced by [`homeassistant.lxc.yaml`](homeassistant.lxc.yaml) (CT 6005)** — dual-homed
+> on Homelab 1010 with an IoT 1040 leg. Stories are under the
+> [Home Assistant milestone](https://github.com/Chrison-Homelab/Homelab.Stacks.SmartHome/milestone/1);
+> the epic is [Homelab#250](https://github.com/Chrison-Homelab/Homelab/issues/250). The multi-NIC
+> blocker is gone (Homelab#386). **VM 2000 is still the live hub until cutover**, so everything
+> below still applies.
+>
+> Three decisions worth knowing before reading on:
+> - **From scratch, no backup restored.** VM 2000 has 75 config entries of which only 19 load, and
+>   530 of its 701 entities are unavailable — mostly ghosts from the previous rental.
+> - **Every Zigbee device gets re-paired.** A fresh ZHA forms a new network. Both `zha` entries are
+>   already `not_loaded` with 0 entities, so nothing working is lost — but it is a walk-around-the-
+>   house job.
+> - **Hard cutover, not side-by-side.** Two live HA instances would share the MQTT broker and the
+>   Zigbee coordinator.
 
 [`homeassistant.vm.yaml`](homeassistant.vm.yaml) captures the live HAOS VM (VMID
 2000) so the stack is **reproducible**, but it is **not converged/applied** — HA
