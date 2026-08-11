@@ -141,6 +141,51 @@ Two failure modes seen:
 > 2. truncated the 1.3 GB log; set `/etc/docker/daemon.json` to `max-size: 20m, max-file: 3`
 >    (existing containers keep their own config — this only helps future ones)
 >
+> ### ⚠️ THE FLOOD HAS A SECOND BLAST RADIUS: THE RECORDER (found 2026-08-11)
+>
+> Silencing the logger fixed the *log* and hid the fact that the flood was still landing somewhere
+> far worse. Every advertisement is also an **`esphome.on_ble_advertise` event on HA's event bus**,
+> and the recorder was persisting all of them. Measured two days after CT 6005 was built:
+>
+> | | |
+> |---|---|
+> | `esphome.on_ble_advertise` rows | **28,350,813** |
+> | Total event rows | 28,368,745 — so the flood is **99.9%** of them |
+> | `home-assistant_v2.db` | **3.97 GB**, growing **~2 GB/day** |
+> | Everything else in the instance | ~76k state rows/day, combined |
+> | Runway on the 32 GB rootfs | **~10 days to full** |
+>
+> A full disk on this container stops Home Assistant, which stops Karl's heating. The logger line
+> made the symptom invisible while the cause kept accelerating — that is the lesson worth keeping.
+>
+> **Fix applied** (`configuration.yaml` on CT 6005):
+>
+> ```yaml
+> recorder:
+>   purge_keep_days: 10
+>   exclude:
+>     event_types:
+>       - esphome.on_ble_advertise
+> ```
+>
+> then `recorder.purge` with `apply_filter: true, repack: true` to clear the backlog. `apply_filter`
+> is the load-bearing option: a plain purge only deletes by **age**, and every one of those rows was
+> hours old, so it would have removed nothing.
+>
+> **Verified result:**
+>
+> | | Before | After |
+> |---|---|---|
+> | `esphome.on_ble_advertise` rows | 28,350,813 | **0** |
+> | Total event rows | 28,368,745 | 25,983 |
+> | `home-assistant_v2.db` | 3.97 GB | **35 MB** |
+> | CT 6005 rootfs used | 8.8 GB / 32 GB | **5.1 GB / 32 GB** |
+>
+> New rows of that type since the restart: **zero**. Nothing is lost — the Xiaomi/BTHome readings
+> arrive as ordinary entity **state** via `bluetooth_proxy` → `bthome`, which the recorder still
+> keeps; only the raw advertisement events are dropped. Remove the exclusion when the firmware is
+> fixed.
+>
 > **Do NOT "just install `ble_monitor`"** to silence it. It would work, but it creates a second set
 > of entities for sensors HA already reports natively via `bthome` — duplicate sources for one
 > physical device, which is how the duplicate Matter server hid for months.
