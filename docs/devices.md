@@ -15,6 +15,13 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 > live; an **HA-only** entry (no lease, and not Zigbee/BLE/IR) may be **stale — verify
 > physically.** Rows below tagged _verify_ are HA-only and unconfirmed in the new home.
 
+> ✅ **The ghost problem is largely gone as of 2026-08-09.** CT 6005 was built **from scratch**
+> with **no backup restored** (see [`../homeassistant.lxc.yaml`](../homeassistant.lxc.yaml)), so its
+> registry contains only what was deliberately re-added — the old instance's 530-of-701 unavailable
+> entities did not come across. That changes how to read this table: on CT 6005, an entity that is
+> `unavailable` is a **real, current fault**, not a leftover. The 2026-08-11 Tuya audit below is the
+> first pass done on that basis.
+
 ## Devices
 
 | Device | Type | Room | Integration | VLAN · IP | MAC | Model / notes | Purchased |
@@ -28,13 +35,15 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 | Echo · Lounge | Voice assistant | Lounge | `alexa_media` | legacy · `192.168.178.200` | `e8:4c:4a:40:0c:52` | Amazon Echo | _owned_ |
 | Echo · Bedroom | Voice assistant | Bedroom | `alexa_media` | legacy · `192.168.178.145` | `10:ce:02:d0:d3:99` | Amazon Echo | _owned_ |
 | Broadlink RM4 mini | IR blaster | _TODO_ | `broadlink` (+ SmartIR) | _TODO_ | — | ⚠️ **not installed yet** — needed to control both ACs; the old Haier AC (`climate.lounge_ac`) was the **previous rental** and is gone | _owned_ |
-| Heater | Smart heater | Karls Bedroom | Tuya (`localtuya`/`tuya`) | IoT · `_TODO_` | — | Tuya `PEH224/225HA` — ⚠️ _verify_ (HA-only, no current lease) | _owned_ |
-| Tower Fan | Fan | Karls Bedroom | Tuya | IoT · `_TODO_` | — | Goldair Platinum Tower Fan — ⚠️ _verify_ | _owned_ |
-| Standing Fan | Fan | Office | Tuya | IoT · `_TODO_` | — | Tuya (model TBC) — ⚠️ _verify_ | _owned_ |
-| Aromalife | Aroma diffuser | Karls Bedroom | Tuya | IoT · `_TODO_` | — | Tuya "Aromalife" — ⚠️ _verify_ | _owned_ |
+| Heater | Smart heater | Karls Bedroom | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya `PEH224/225HA` — ✅ **live** (`climate.heater`, `switch.heater_child_lock`). **Factory-reset + re-paired 2026-08-11**; the Tuya device id survived (`ebe662f772153847dasmus`), so the entity ids and Karl's heating automation needed no rewiring. Load-bearing: see [Tuya](#tuya--cloud-only-and-half-the-fleet-is-dark) | _owned_ |
+| Tower Fan ("Bedroom Fan") | Fan | Karls Bedroom | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Goldair Platinum Tower Fan (`fan.bedroom_fan`, + `sensor.bedroom_fan_temperature`) — ⛔ **offline** since 2026-08-09; has never reported to CT 6005 | _owned_ |
+| Standing Fan | Fan | Office | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya (model TBC; `fan.standing_fan`) — ⛔ **offline** since 2026-08-09 | _owned_ |
+| Aromalife | Aroma diffuser | Karls Bedroom | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya "Aromalife" — ✅ **live** (`switch.aromalife_power`, `switch.aromalife_spray`) | _owned_ |
+| Smart Plug · Lounge | Smart plug | Lounge | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya "smart plug" with energy metering (`switch.smart_plug_lounge_socket_1` + current/power/voltage/total-energy) — ⛔ **offline** since 2026-08-09. **Was missing from this table** until the 2026-08-11 audit | _owned_ |
+| Smart Plug · Guest Room | Smart plug | Guest Room | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya smart plug, energy metering + child lock + power-on-behaviour (`switch.smart_plug_guest_room_socket_1`) — ⛔ **offline** since 2026-08-09. **Was missing from this table** until the 2026-08-11 audit | _owned_ |
 | Alen BreatheSmart 45i | Air purifier | _TODO_ | _TODO_ (Tuya?) | IoT · `10.40.169.147` | `c4:82:e1:6d:15:cc` | Alen 45i True HEPA (live on network) | _owned_ |
 | Tapo C200 | Wi-Fi camera | Karls Bedroom | `tapo` (TP-Link) | IoT · `_TODO_` | — | TP-Link Tapo C200 (motion/person/baby-cry) — ⚠️ _verify_ | _owned_ |
-| Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`) | _owned_ |
+| Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`); `sensor.temperaturer_t1_*`. ✅ **live on CT 6005** (battery 100%) and **load-bearing** — it is the `secondary` input to Karl's night heating, so it is now watched by the sensor watchdog rather than excluded as dead | _owned_ |
 | Nest Protect | Smoke/CO alarm | _TODO_ | _TODO_ (Nest) | IoT · `10.40.2.131` | `d8:c8:0c:b0:9e:28` | Nest Protect | _owned_ |
 | Meross Smart Plug | Smart plug | Garage | `meross_lan` (local) | IoT · `10.40.170.241` | `48:e1:e9:dd:88:d9` | Meross `mss310` | _owned_ |
 | Samsung Washer | Appliance | Laundry | SmartThings | IoT · `10.40.84.50` | `50:fd:d5:85:6c:92` | Samsung `DA_WM_TP2_20` | _owned_ |
@@ -48,6 +57,42 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 > **Not smart-home devices** (seen in HA/UniFi but infra): the "AC LR (…)" entries are
 > **UniFi U7LR access points** (not air-con), "USW Flex Mini" are UniFi switches, plus the
 > Synology NAS, Proxmox nodes, and weather/rubbish-collection service integrations.
+
+## Tuya — cloud-only, and half the fleet is dark
+
+Audited **2026-08-11** against CT 6005's registries and recorder. The `tuya` config entry
+(account `christian.simon1988@gmail.com`) is healthy and holds **six** devices — two more than
+this table used to list. Their state is not uniform, and the split matters:
+
+| Device | Entity | State |
+|---|---|---|
+| Heater (Karls Bedroom) | `climate.heater` | ✅ live — re-paired 2026-08-11 |
+| Aromalife (Karls Bedroom) | `switch.aromalife_power` | ✅ live |
+| Tower Fan (Karls Bedroom) | `fan.bedroom_fan` | ⛔ offline since the 08-09 rebuild |
+| Standing Fan (Office) | `fan.standing_fan` | ⛔ offline since the 08-09 rebuild |
+| Smart Plug (Lounge) | `switch.smart_plug_lounge_socket_1` | ⛔ offline since the 08-09 rebuild |
+| Smart Plug (Guest Room) | `switch.smart_plug_guest_room_socket_1` | ⛔ offline since the 08-09 rebuild |
+
+**The four dark ones are not an HA problem.** They are registered in the Tuya cloud and HA created
+their entities correctly at first boot; they have simply never reported since, i.e. they are not
+reaching Tuya's cloud at all. Two of the six work from the same account and the same integration,
+which rules out credentials. Check power and Wi-Fi on the devices themselves — likely candidates
+are units that never came back after the move, or that are still joined to an SSID that no longer
+exists. Until then no amount of HA-side work will surface them.
+
+**Every one of these is CLOUD-CONTROLLED, and that has a real cost.** Commands leave the house:
+`tuya_sharing` POSTs to `/v1.1/m/thing/<id>/commands`, so each service call is a round trip to
+Tuya's API. This is why Karl's night heating was rewritten to **send only on change** on
+2026-08-11 — the old shape re-asserted `climate.set_hvac_mode` on every evaluation (~4,949 runs
+and ~3,200 cloud calls per day, because the BTHome sensors it triggers on report every ~19 s), and
+the API answered often enough with `RemoteDisconnected` to leave error bursts in the log on
+08-09/08-10. Anything new that drives a Tuya entity on a timer or a sensor trigger must carry the
+same guard.
+
+> **`localtuya` is the standing escape hatch, not adopted.** Local control would remove the cloud
+> dependency for the heater entirely, which is attractive for a device a toddler's room depends on.
+> It needs per-device local keys, so it is a deliberate project rather than a quick swap — and note
+> the heater's ID has now survived one factory reset, so the keys would likely be stable.
 
 ## Zigbee — staying on ZHA (decided 2026-07-18)
 
@@ -71,6 +116,8 @@ Devices with their own reverse-engineering / integration notes live under [`devi
 
 ## To identify / tidy
 - **Wi-Fi IPs** for the Tuya/Tapo/Broadlink devices — capture from UniFi + DHCP-reserve.
+- **The four dark Tuya devices** (both fans, both smart plugs) — check power/Wi-Fi at the device;
+  they have not reached the Tuya cloud once since 2026-08-09 ([why that is device-side](#tuya--cloud-only-and-half-the-fleet-is-dark)).
 - **Tube's ZB Gateway** (`192.168.179.222`) — on the **legacy** net; move to **IoT 1040** + DHCP-reserve before any Z2M cutover (see [deep-dive](devices/tube-zb-gw-efr32/)).
 - **Consumer/media devices on the legacy net** (Echoes, Apple TV, Philips TV, Sony TV) — still on legacy `192.168.178/9`, not segmented onto **Consumer 1020** or **IoT 1040**. Tidy-up candidate.
 - **Xiaomi Hub 2** — power on + find on UniFi (Wi-Fi), DHCP-reserve, record model/MAC ([notes](devices/xiaomi-smart-home-hub-2/)).
