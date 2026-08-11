@@ -89,6 +89,13 @@ the API answered often enough with `RemoteDisconnected` to leave error bursts in
 08-09/08-10. Anything new that drives a Tuya entity on a timer or a sensor trigger must carry the
 same guard.
 
+Measured after the rewrite: **30 automation runs in 9.1 minutes and zero `climate.*` service
+calls**, because the heater was already in the state the automation wanted. The automation still
+evaluates on every sensor report — that part is deliberate, it is what keeps the room responsive —
+it just no longer talks to Tuya unless something has to change. `climate.heater` was also added to
+its triggers (mode changes only), so an out-of-band change such as someone pressing the physical
+button is corrected within seconds rather than relying on the old ~17-second re-assert to mask it.
+
 > **`localtuya` is the standing escape hatch, not adopted.** Local control would remove the cloud
 > dependency for the heater entirely, which is attractive for a device a toddler's room depends on.
 > It needs per-device local keys, so it is a deliberate project rather than a quick swap — and note
