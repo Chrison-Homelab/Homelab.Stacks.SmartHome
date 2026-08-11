@@ -96,6 +96,43 @@ it just no longer talks to Tuya unless something has to change. `climate.heater`
 its triggers (mode changes only), so an out-of-band change such as someone pressing the physical
 button is corrected within seconds rather than relying on the old ~17-second re-assert to mask it.
 
+### Seasonal devices — kept, but only shown when they are actually there
+
+Three of these are seasonal rather than broken: **both fans live in a cupboard over winter** and the
+**heater goes away for summer**. They are deliberately **not** deleted from HA — that keeps their
+history, their automations and (for the heater) a device id that has already survived one factory
+reset. What was wanted instead was for them to vanish from the dashboard while they are away and
+reappear on their own.
+
+Done with native per-card **`visibility:`** conditions on a curated YAML dashboard
+(`/config/dashboards/home.yaml`, served at `/smart-home`, registered from `configuration.yaml`):
+
+```yaml
+- type: tile
+  entity: fan.bedroom_fan
+  visibility:
+    - condition: state
+      entity: fan.bedroom_fan
+      state_not: unavailable
+```
+
+No HACS, no helper entities, no automation to maintain — the card is simply absent while the device
+is, and returns within seconds of it reporting again. The **Office section carries the condition at
+section level** because the standing fan is its only occupant; without that, an empty "Office"
+heading would sit there all winter.
+
+The auto-generated **Overview is deliberately left alone** as the catch-all, so a newly added device
+is never invisible just because nobody hand-added it to the curated view.
+
+> ⚠️ **Hiding an offline device also hides a fault** — fine for a fan in a cupboard, not fine for
+> the heater in a toddler's room. So the heater's disappearance is **also alerted on**: the sensor
+> watchdog pushes to the phone when `climate.heater` is unavailable *and heat is actually wanted*
+> (inside the 18:30–07:00 window with the room at or below the same 17 °C floor the heating
+> automation acts on). That is season-agnostic on purpose — in summer the room is never that cold at
+> night, so there is no monthly switch to remember to flip, and a heater that dies in July still
+> raises an alarm. Verified by simulation both ways: cold room + missing heater alerts, warm room +
+> missing heater stays silent.
+
 > **`localtuya` is the standing escape hatch, not adopted.** Local control would remove the cloud
 > dependency for the heater entirely, which is attractive for a device a toddler's room depends on.
 > It needs per-device local keys, so it is a deliberate project rather than a quick swap — and note
