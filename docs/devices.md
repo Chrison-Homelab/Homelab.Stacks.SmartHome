@@ -46,7 +46,7 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 | Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`); `sensor.temperaturer_t1_*`. ✅ **live on CT 6005** (battery 100%) and **load-bearing** — it is the `secondary` input to Karl's night heating, so it is now watched by the sensor watchdog rather than excluded as dead | _owned_ |
 | Nest Protect | Smoke/CO alarm | _TODO_ | _TODO_ (Nest) | IoT · `10.40.2.131` | `d8:c8:0c:b0:9e:28` | Nest Protect | _owned_ |
 | Meross Smart Plug | Smart plug | Garage | `meross_lan` (local) | IoT · `10.40.170.241` | `48:e1:e9:dd:88:d9` | Meross `mss310` | _owned_ |
-| Samsung Washer | Appliance | Laundry | SmartThings | IoT · `10.40.84.50` | `50:fd:d5:85:6c:92` | Samsung `DA_WM_TP2_20` | _owned_ |
+| Samsung Washer | Appliance | Laundry | **SmartThings** (cloud OAuth) | IoT · `10.40.84.50` | `50:fd:d5:85:6c:92` | Samsung `DA_WM_TP2_20`. ✅ live — 16 entities (`sensor.laundry_room_washer_machine_state`, energy, `switch.…_bubble_soak`, …). Auth is **`auth_implementation: cloud`** and has to be — see [Samsung washer](#samsung-washer--why-it-is-stuck-on-cloud-account-linking) | _owned_ |
 | Xiaomi Temp & Humidity Monitor 2 ×2 | BLE temp/humidity | _TODO_ | ✅ **pvvx `ATC_v58` → BTHome v2** (unencrypted) → HA via Tube-gw BLE proxy ([done →](devices/xiaomi-lywsd03mmc/)) | _not IP (BLE, battery)_ | `A4:C1:38:1F:09:C0`, `A4:C1:38:20:6E:6B` | `LYWSD03MMC` **HW B1.4**; flashed 2026-07-20 (`ATC_1F09C0` / `ATC_206E6B`); Mi keys in BW | _owned (2026-07-18)_ |
 | **Tube's ZB Gateway** | Zigbee coordinator **+ BLE proxy (ON)** | Garage | **ZHA** today (`socket://…:6638`); → Z2M planned ([docs →](devices/tube-zb-gw-efr32/)) | legacy · `192.168.179.222` → **move to IoT 1040** | `20:43:a8:c7:62:b3` | OEM "藏机/Cangji" TubesZB `efr32-MGM210-poe` clone; web login `cangji`/`cangji` (in BW); ⚠️ `Esp_Bluetooth` **ON since 2026-07-20** as the LYWSD03MMC BLE proxy — *prev flooded HA ×2, monitor* | _owned_ |
 | Xiaomi Smart Home Hub 2 | Multi-protocol hub | _TODO_ | _TODO_ — Zigbee/BLE/IR ([notes →](devices/xiaomi-smart-home-hub-2/)) | **⚠️ detect** (Wi-Fi) | _TODO_ | Alt Zigbee/BLE hub; not the local-first BLE relay | _owned_ |
@@ -57,6 +57,58 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 > **Not smart-home devices** (seen in HA/UniFi but infra): the "AC LR (…)" entries are
 > **UniFi U7LR access points** (not air-con), "USW Flex Mini" are UniFi switches, plus the
 > Synology NAS, Proxmox nodes, and weather/rubbish-collection service integrations.
+
+## Samsung washer — why it is stuck on cloud account linking
+
+**Do not spend another afternoon trying to self-host these OAuth credentials. It cannot be done
+on this Home Assistant version.** Investigated properly on 2026-08-16; recording the dead end so
+nobody repeats it.
+
+The washer's config entry uses **`auth_implementation: cloud`** — Nabu Casa's account-linking
+service brokers the OAuth. Replacing that with our own OAuth client is blocked from both ends
+simultaneously:
+
+- **Home Assistant requires the `sse` scope.** `async_oauth_create_entry` in
+  `homeassistant/components/smartthings/config_flow.py` aborts with `missing_scopes` unless the
+  granted token carries every entry in `SCOPES` (`const.py`), and `sse` is one of them.
+- **SmartThings will not grant `sse` to a self-registered app.** Both `apps:create` and
+  `apps:oauth:update` return `422 ConstraintViolationError` /
+  `NotValidValue: oauthScope[sse]`. That is a **server-side** rejection, not a CLI omission
+  (though the CLI's own `availableScopes` list is correspondingly 13 entries with no `sse`).
+  The Developer Workspace UI was checked too — those options are no longer offered there either.
+
+Nabu Casa holds `sse` as a platform partner. There is no user-accessible route to it. Patching
+`SCOPES` in core was rejected as a "fix": that file lives in the container image, not `/config`,
+so it would be silently reverted by every HA update — a permanent fix that breaks monthly is worse
+than none.
+
+### That is far less fragile than it sounds
+
+The instinct is that a Nabu Casa dependency means a Nabu Casa subscription, and this instance has
+never signed in to HA Cloud. It works anyway, and deliberately so — the refresh path in
+`hass_nabucasa/account_link.py` is:
+
+```
+POST https://{account_link_server}/refresh_token/smartthings
+     {"refresh_token": "..."}
+```
+
+**No auth header, no subscription check.** Note also that the config flow refuses to start at all
+unless the `cloud` *component* is loaded (`cloud_not_enabled`) — that is the component, shipped in
+`default_config`, not an account.
+
+### The "it breaks every few months" pain is already gone
+
+That was the **Personal Access Token** era. Samsung cut newly issued PATs to a 24-hour lifetime in
+December 2024, and HA replaced the PAT-based SmartThings integration with OAuth in 2025.3. The
+current model is a 24-hour access token plus a refresh token that rotates on every use inside a
+~30-day window, renewed daily while HA runs. The realistic remaining failure is a **lost token
+rotation** — uncommon, and not something any amount of configuration prevents.
+
+So it is not made bulletproof; it is made **loud**. `automation.smartthings_watchdog_washer_offline_re_auth_needed`
+pushes to the phone if `sensor.laundry_room_washer_machine_state` goes `unavailable` for 12 hours,
+linking straight to `/config/integrations`. Twelve hours because the washer reports continuously
+while mains-powered, so half a day of silence is a dead integration rather than an idle appliance.
 
 ## Baby monitor — the C200 on Consumer 1020
 
