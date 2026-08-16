@@ -97,18 +97,39 @@ POST https://{account_link_server}/refresh_token/smartthings
 unless the `cloud` *component* is loaded (`cloud_not_enabled`) — that is the component, shipped in
 `default_config`, not an account.
 
-### The "it breaks every few months" pain is already gone
+### The "it breaks every few months" pain was already fixed upstream
 
-That was the **Personal Access Token** era. Samsung cut newly issued PATs to a 24-hour lifetime in
-December 2024, and HA replaced the PAT-based SmartThings integration with OAuth in 2025.3. The
-current model is a 24-hour access token plus a refresh token that rotates on every use inside a
-~30-day window, renewed daily while HA runs. The realistic remaining failure is a **lost token
-rotation** — uncommon, and not something any amount of configuration prevents.
+**This is the part worth reading, because it is the reason none of the above needs solving.**
 
-So it is not made bulletproof; it is made **loud**. `automation.smartthings_watchdog_washer_offline_re_auth_needed`
-pushes to the phone if `sensor.laundry_room_washer_machine_state` goes `unavailable` for 12 hours,
-linking straight to `/config/integrations`. Twelve hours because the washer reports continuously
-while mains-powered, so half a day of silence is a dead integration rather than an idle appliance.
+That pain was the **Personal Access Token** era. A PAT is a static credential with nothing to renew
+it, and Samsung cut newly issued ones to a 24-hour lifetime in December 2024. Home Assistant
+replaced the PAT-based SmartThings integration with OAuth in **2025.3**. The current model is a
+24-hour access token plus a refresh token that rotates on every use inside a ~30-day window,
+renewed daily and unattended for as long as HA is running.
+
+Those are not the same system with a better track record. They are **different systems**, and the
+live entry is already the new one — `"version": 3` in `core.config_entries` is the marker (the PAT
+integration wrote version 1/2 entries). Nothing here was hardened; the ground moved underneath the
+problem before anyone went looking at it.
+
+> **Corollary: the token page is a relic.** `account.smartthings.com/tokens` still issues PATs and
+> they still authenticate against the API — handy for one-off CLI work — but **no part of Home
+> Assistant can consume one any more.** The config flow is an `AbstractOAuth2FlowHandler` with only
+> `user` / `reauth` / `reauth_confirm` steps; there is no field to paste a token into. Creating one
+> to "fix" the integration reaches for the very mechanism that used to break.
+
+Evidence as of 2026-08-16, 5.0 days after the entry was created: zero SmartThings auth errors in
+the log, all 16 entities reporting, token renewing on its 24-hour cycle. Five days is thin, and
+this instance is only a week old — so the confidence comes from the mechanism having changed, not
+from elapsed time.
+
+Which is why the remaining measure is not more configuration but a **witness**. The one realistic
+failure left is a lost token rotation, which nothing prevents. So it is not made bulletproof; it is
+made **loud**: `automation.smartthings_watchdog_washer_offline_re_auth_needed` pushes to the phone
+if `sensor.laundry_room_washer_machine_state` goes `unavailable` for 12 hours, linking straight to
+`/config/integrations`. Twelve hours because the washer reports continuously while mains-powered,
+so half a day of silence is a dead integration rather than an idle appliance. It doubles as the
+proof: if it never fires, this all works.
 
 ## Baby monitor — the C200 on Consumer 1020
 
