@@ -42,7 +42,7 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 | Smart Plug · Lounge | Smart plug | Lounge | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya "smart plug" with energy metering (`switch.smart_plug_lounge_socket_1` + current/power/voltage/total-energy) — ⛔ **offline** since 2026-08-09. **Was missing from this table** until the 2026-08-11 audit | _owned_ |
 | Smart Plug · Guest Room | Smart plug | Guest Room | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya smart plug, energy metering + child lock + power-on-behaviour (`switch.smart_plug_guest_room_socket_1`) — ⛔ **offline** since 2026-08-09. **Was missing from this table** until the 2026-08-11 audit | _owned_ |
 | Alen BreatheSmart 45i | Air purifier | _TODO_ | _TODO_ (Tuya?) | IoT · `10.40.169.147` | `c4:82:e1:6d:15:cc` | Alen 45i True HEPA (live on network) | _owned_ |
-| Tapo C200 | Wi-Fi camera | Karls Bedroom | `tapo` (TP-Link) | IoT · `_TODO_` | — | TP-Link Tapo C200 (motion/person/baby-cry) — ⚠️ _verify_ | _owned_ |
+| Tapo C200 ("Karl Babymonitor") | Wi-Fi camera / baby monitor | Karls Bedroom | **`onvif`** (native, local RTSP) | **Consumer 1020 · `10.20.44.116`** | `f0:09:0d:60:97:53` | TP-Link Tapo C200. ✅ **live in HA** since 2026-08-16 — `camera.karl_babymonitor_mainstream` (1920×1080), plus IR-lamp/autofocus/wiper switches and reboot buttons. **Deliberately NOT on IoT** — see [Baby monitor](#baby-monitor--the-c200-on-consumer-1020) | _owned_ |
 | Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`); `sensor.temperaturer_t1_*`. ✅ **live on CT 6005** (battery 100%) and **load-bearing** — it is the `secondary` input to Karl's night heating, so it is now watched by the sensor watchdog rather than excluded as dead | _owned_ |
 | Nest Protect | Smoke/CO alarm | _TODO_ | _TODO_ (Nest) | IoT · `10.40.2.131` | `d8:c8:0c:b0:9e:28` | Nest Protect | _owned_ |
 | Meross Smart Plug | Smart plug | Garage | `meross_lan` (local) | IoT · `10.40.170.241` | `48:e1:e9:dd:88:d9` | Meross `mss310` | _owned_ |
@@ -57,6 +57,56 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 > **Not smart-home devices** (seen in HA/UniFi but infra): the "AC LR (…)" entries are
 > **UniFi U7LR access points** (not air-con), "USW Flex Mini" are UniFi switches, plus the
 > Synology NAS, Proxmox nodes, and weather/rubbish-collection service integrations.
+
+## Baby monitor — the C200 on Consumer 1020
+
+Karl's room camera runs through HA's **native `onvif`** integration, pulling RTSP directly from
+`10.20.44.116`. The video never leaves the house and no cloud account is involved in the HA path.
+
+**It stays on Consumer 1020, on purpose.** Every other smart-home device belongs on IoT 1040, and
+this one is the documented exception: moving it would have meant re-onboarding it to
+`Blackbox_IOT`, which degrades the Tapo app experience the household actually relies on. That
+trade — architectural tidiness for a thing a parent uses at 2am — was made knowingly.
+
+**No firewall change was needed, and none should be added for it.** The existing custom
+`Allow All Traffic` policy from the **Homelab** zone to the **Internal** zone already covers it
+(Consumer 1020 sits inside Internal), so HA reaches ports 443/554/2020 as-is. This was verified
+from inside CT 6005, not assumed:
+
+```
+443: CONNECTED   554: CONNECTED   2020: CONNECTED
+RTSP 554 -> RTSP/1.0 200 OK
+```
+
+> **Beware `/dev/tcp` when testing this.** An earlier check ran
+> `pct exec 6005 -- sh -c "echo > /dev/tcp/<ip>/<port>"` and reported every port blocked. That is
+> a false negative: the container's `sh` is **dash**, which has no `/dev/tcp`, so the test fails
+> identically whether the port is open or not. It nearly bought a pointless VLAN migration. Use a
+> real socket (`python3 -c "import socket; socket.create_connection(...)"`) instead.
+
+### Limits worth knowing
+
+- **Two concurrent streams, total.** HA's stream plus the Tapo app on a phone uses both; a third
+  viewer gets a black frame. That is the camera, not a fault.
+- **No baby-cry detection in HA.** It exists in the Tapo app only — TP-Link does not publish it
+  over ONVIF, and the community `tapo_control` integration reads the *sensitivity* setting without
+  exposing detections ([upstream issue](https://github.com/JurajNyiri/HomeAssistant-Tapo-Control/issues/1327)).
+  Keep the Tapo app's own push notifications for crying; HA covers live view and motion.
+- **`autofocus` and `wiper` entities are meaningless here.** ONVIF advertises those capabilities
+  generically; a C200 has a fixed-focus lens and no wiper. Left in place, kept off the dashboard.
+
+### Why not `tapo_control`
+
+It was installed, evaluated and **removed**. It offers privacy mode (the physical lens shutter),
+night-vision modes and the siren, none of which were wanted enough to keep a custom integration on
+the update treadmill. It also could not complete setup: its "cloud password" step is really a
+**local `admin` login to the camera**, and on Tapo firmware that password is whatever the owning
+TP-Link account's password was **at enrolment** (2025-10-03) — not the current one. Neither stored
+credential matched. Revisit only if the lens shutter becomes worth it, and re-provision the camera
+from the Tapo app first so its admin credential is current.
+
+> ⚠️ Repeated failed local logins trigger a camera-side **Temporary Suspension**. Do not iterate
+> through passwords against it.
 
 ## Tuya — cloud-only, and half the fleet is dark
 
@@ -178,8 +228,10 @@ Devices with their own reverse-engineering / integration notes live under [`devi
 
 ## Notes
 - **Integrations at a glance:** Zigbee → **ZHA** (via Tube gw); Matter → matter-server (CT 6001);
-  MQTT → broker (CT 6000); Chromecast → AirCast (CT 6002); the C10 → Mate (CT 4100); Tuya/Meross/
-  SmartThings/Tapo/Alexa/Nest → their own integrations; IR → Broadlink RM4 mini + SmartIR (**planned** — blaster not installed yet). **ACs split by brand:** the **downstairs Daikin** goes **wired S21 + ESPHome** (not IR — [docs](devices/daikin-ftxf-s21/)); the **upstairs Mitsubishi Heavy Industries** unit → **wired CNS** (MHI-AC-Ctrl-ESPHome, SPI) or IR fallback (TBD).
+  MQTT → broker (CT 6000); Chromecast → AirCast (CT 6002); the C10 → Mate (CT 4100); the **C200
+  baby monitor → native `onvif`**, local RTSP, no cloud (not the Tapo integration — see
+  [Baby monitor](#baby-monitor--the-c200-on-consumer-1020)); Tuya/Meross/
+  SmartThings/Alexa/Nest → their own integrations; IR → Broadlink RM4 mini + SmartIR (**planned** — blaster not installed yet). **ACs split by brand:** the **downstairs Daikin** goes **wired S21 + ESPHome** (not IR — [docs](devices/daikin-ftxf-s21/)); the **upstairs Mitsubishi Heavy Industries** unit → **wired CNS** (MHI-AC-Ctrl-ESPHome, SPI) or IR fallback (TBD).
 - The SmartHome **services** themselves (broker/matter/aircast/HA) live in
   [`../README.md`](../README.md), not here.
 </content>
