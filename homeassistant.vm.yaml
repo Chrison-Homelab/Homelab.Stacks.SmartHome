@@ -106,25 +106,46 @@ spec:
   # net1 carries NO DEFAULT ROUTE (`nmcli con mod "Supervisor enp6s19" ipv4.never-default
   # yes`) — it is device-facing only. Without that it is luck: NetworkManager happened to
   # assign it metric 20102, but a reconnect could recompute.
+  # All three reservations are PARKED (superproject #416). This VM is `manage: retired` and
+  # kept only as the CT 6005 rollback, so its addresses must stay held — but converge must
+  # never write them either. `parked:` says exactly that, and stops the audit reporting them
+  # as orphans, which is otherwise indistinguishable from a reservation whose guest is gone.
+  # (On a kind: VM shape a reservation is audit-only regardless; declaring them here is about
+  # recording intent, not about converge acting on it.)
   networks:
     - bridge: vmbr0                     # net0 — untagged/native → guest enp6s18
-      hwaddr: "02:1F:98:8B:6F:6A"       #        ACTIVE, legacy 192.168.179.102 — default route, metric 100.
+      hwaddr: "02:1F:98:8B:6F:6A"       #        legacy 192.168.179.102 — default route, metric 100.
                                         #        STILL PRIMARY; retiring it is the rest of #339 (see below).
+      reservation:
+        fixedIp: 192.168.179.102
+        parked: "VM 2000 is the CT 6005 rollback (#250); legacy-VLAN address held until #339 retires net0"
     - bridge: vmbr0                     # net1 — IoT VLAN → guest enp6s19
-      hwaddr: "BC:24:11:C0:7F:BB"       #        ACTIVE, 10.40.0.20 (reserved). L2 path to the Zigbee gateway
+      hwaddr: "BC:24:11:C0:7F:BB"       #        10.40.0.20. L2 path to the Zigbee gateway
       tag: 1040                         #        (10.40.0.21), Mosquitto (10.40.26.247) and Matter (10.40.62.181).
       firewall: true                    #        never-default: no default route via this leg.
+      reservation:
+        fixedIp: 10.40.0.20
+        parked: "VM 2000 is the CT 6005 rollback (#250) — CT 6005's IoT leg is 10.40.0.22"
     - bridge: vmbr0                     # net2 — Homelab VLAN → guest enp6s20
-      hwaddr: "BC:24:11:3C:03:54"       #        ACTIVE, 10.10.0.20 (reserved). Default route metric 101.
+      hwaddr: "BC:24:11:3C:03:54"       #        10.10.0.20. Default route metric 101.
       tag: 1010                         #        Pangolin reaches HA here once net0 goes.
       firewall: true
+      reservation:
+        fixedIp: 10.10.0.20
+        parked: "VM 2000 is the CT 6005 rollback (#250) — CT 6005's Homelab leg is 10.10.0.21"
   # ⚠ RETIRING net0 (the remainder of #339) is NOT just deleting the NIC:
-  #   1. `homeassistant.homelab.chrison.internal` is attached to a reservation keyed on
-  #      net0's MAC (02:1F:98:8B:6F:6A). Re-key it to BC:24:11:3C:03:54 or the name — which
-  #      the Pangolin resource now targets — stops resolving.
-  #   2. net0 currently holds the metric-100 default route. enp6s20 must become primary
+  #   1. net0 currently holds the metric-100 default route. enp6s20 must become primary
   #      first, or HA loses egress.
-  #   3. Only then can the custom `Internal -> IOT` allow be reconsidered, which is what
+  #   2. Only then can the custom `Internal -> IOT` allow be reconsidered, which is what
   #      "fully isolate IoT" actually requires.
+  #
+  # CORRECTED 2026-08-16: this used to warn that `homeassistant.homelab.chrison.internal`
+  # was "attached to a reservation keyed on net0's MAC (02:1F:98:8B:6F:6A)" and that
+  # re-keying it would break the Pangolin resource. Checked against the live controller:
+  # it is a UniFi STATIC-DNS A record pointing straight at 10.10.0.21 — CT 6005 — not a
+  # per-client record on this VM at all, and net0's reservation carries no DNS name. So
+  # retiring net0 does not touch that name. (CT 6005's own reservation separately carries
+  # `homeassistant.iot.chrison.internal`; both names resolve to 10.10.0.21 today.) The
+  # static-DNS records are still hand-made and undeclared — superproject #314.
 
   tags: [hpe-01, smart-home, vlan-1010, vlan-1040]   # preserve the existing Proxmox tags

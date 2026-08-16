@@ -71,20 +71,33 @@ spec:
   # is the first live exercise of that code — check `pct config 6005` after the first apply.
   #
   # No hwaddr pinned: Proxmox generates them and the reconciler carries the generated MAC
-  # forward on every later pass, so DHCP reservations stay valid. Reserve both addresses
-  # post-deploy, as every other member in this stack does.
+  # forward on every later pass, so DHCP reservations stay valid. Both reservations are now
+  # DECLARED below rather than reserved by hand — converge reads each NIC's live MAC after
+  # create and reconciles the controller entry (superproject #416).
   networks:
     - name: vlan1010     # net0 — Homelab VLAN. PRIMARY: default route, and how HA is reached.
       bridge: vmbr0
       tag: 1010
-      ip: dhcp           # DHCP-reserved post-deploy; the internal DNS name follows it (#20)
+      ip: dhcp
       firewall: true
+      reservation:
+        fixedIp: 10.10.0.21
+        # The name HA is reached by from OTHER VLANs — a per-client record on the reservation,
+        # not a zone entry, so re-keying this reservation to another MAC silently re-points it.
+        # Note the .iot. label on a VLAN-1010 address: it is the household-facing name for the
+        # hub and predates the move to CT 6005, so it is kept as-is rather than "corrected".
+        # pangolin.lxc.yaml routes to homeassistant.homelab.chrison.internal on this basis.
+        localDnsRecord: homeassistant.iot.chrison.internal
     - name: vlan1040     # net1 — IoT VLAN. Device-facing only.
       bridge: vmbr0
       tag: 1040
-      ip: dhcp           # DHCP-reserved post-deploy
+      ip: dhcp
       ip6: auto          # SLAAC on fd00:40::/64 — mDNS/HomeKit/Matter discovery is IPv6-first
       firewall: true
+      reservation:
+        # No DNS name: devices find HA on this leg by mDNS/discovery, not by name. The address
+        # is pinned anyway so the Zigbee coordinator and Matter fabric keep a stable peer.
+        fixedIp: 10.40.0.22
   # ⚠️ net1 MUST NOT carry a default route. On VM 2000 this needed an explicit
   # `nmcli con mod <iface> ipv4.never-default yes`; without it the metric is luck — NM
   # happened to pick a high one, but a reconnect can recompute. Proxmox cannot express

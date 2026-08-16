@@ -66,3 +66,9 @@ spec:
     vlan: 1040
     ipv4: dhcp
     ipv6: auto           # SLAAC — Matter needs IPv6 to the devices on this L2
+    # DHCP reservation (#416). HA points at this server by address in its Matter config,
+    # and the commissioned fabric is bound to this node — a moved lease means re-pairing
+    # devices, not just editing a setting. This is the stack's only member with a
+    # pre-existing `network:` block; the reservation is additive to it.
+    reservation:
+      fixedIp: 10.40.62.181
