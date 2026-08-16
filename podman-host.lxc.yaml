@@ -39,6 +39,10 @@ spec:
   cores: 1               # light: one Python container polling a car API
   memory: 1024           # MB — podman + one container + SQLite
   disk: 10               # GB — image layers + Mate's SQLite/state under /home/podman
+  # DHCP reservation (#416). Stable target for the quadlet workloads' published ports.
+  network:
+    reservation:
+      fixedIp: 10.40.207.170
 
   features:
     nesting: true        # rootless podman needs nesting for its own nested userns

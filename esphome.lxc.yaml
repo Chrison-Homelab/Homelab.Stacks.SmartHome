@@ -46,6 +46,12 @@ spec:
   cores: 2               # compiles are CPU-bound — bump for faster builds
   memory: 2048           # MB — comfortable for a single ESPHome build (idle footprint is tiny)
   disk: 16               # GB — PlatformIO toolchains + per-platform build caches are chunky
+  # DHCP reservation (#416). Devices are flashed with an OTA target, so this address is
+  # baked into firmware already in the field — the one host here where a moved lease
+  # costs a physical reflash rather than a config edit.
+  network:
+    reservation:
+      fixedIp: 10.40.60.203
 
   # node / network / os / source / timezone inherited from stack.yaml defaults
   # (hpe-01, VLAN 1040 IoT, debian 13, community-scripts stable). No Docker features

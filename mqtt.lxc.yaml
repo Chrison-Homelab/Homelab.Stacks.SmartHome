@@ -32,6 +32,12 @@ spec:
   cores: 1               # a broker is light: relays small messages
   memory: 512            # MB — Mosquitto's footprint is tiny
   disk: 2                # GB — config + a small persistence store
+  # DHCP reservation (#416). Every MQTT client on every VLAN is configured with this
+  # address, and the broker has no discovery — a new lease silently disconnects the
+  # whole IoT estate. That was a "⚠ reserve post-deploy" comment; now it is declared.
+  network:
+    reservation:
+      fixedIp: 10.40.26.247
 
   # node / network / os / source / timezone inherited from stack.yaml defaults
   # (hpe-01, VLAN 1040, debian 13, community-scripts stable). No mounts — the

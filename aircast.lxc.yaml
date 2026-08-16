@@ -31,6 +31,11 @@ spec:
   cores: 1               # a tiny mDNS/RTP bridge
   memory: 512            # MB
   disk: 6                # GB — Docker image layers + a KB of config
+  # DHCP reservation (#416). Host-net mDNS/RTP bridge — AirPlay senders cache the
+  # address they discovered, so a moved lease breaks casting until they re-discover.
+  network:
+    reservation:
+      fixedIp: 10.40.147.133
 
   features:
     nesting: true        # Docker-in-LXC
