@@ -43,11 +43,12 @@ Zigbee / cloud / IR devices that never hold a Wi-Fi lease). Annotate the human b
 | Smart Plug · Guest Room | Smart plug | Guest Room | Tuya cloud (`tuya`) | IoT · `_TODO_` | — | Tuya smart plug, energy metering + child lock + power-on-behaviour (`switch.smart_plug_guest_room_socket_1`) — ⛔ **offline** since 2026-08-09. **Was missing from this table** until the 2026-08-11 audit | _owned_ |
 | Alen BreatheSmart 45i | Air purifier | _TODO_ | _TODO_ (Tuya?) | IoT · `10.40.169.147` | `c4:82:e1:6d:15:cc` | Alen 45i True HEPA (live on network) | _owned_ |
 | Tapo C200 ("Karl Babymonitor") | Wi-Fi camera / baby monitor | Karls Bedroom | **`onvif`** (native, local RTSP) | **Consumer 1020 · `10.20.44.116`** | `f0:09:0d:60:97:53` | TP-Link Tapo C200. ✅ **live in HA** since 2026-08-16 — `camera.karl_babymonitor_mainstream` (1920×1080), plus IR-lamp/autofocus/wiper switches and reboot buttons. **Deliberately NOT on IoT** — see [Baby monitor](#baby-monitor--the-c200-on-consumer-1020) | _owned_ |
-| Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`); `sensor.temperaturer_t1_*`. ✅ **live on CT 6005** (battery 100%) and **load-bearing** — it is the `secondary` input to Karl's night heating, so it is now watched by the sensor watchdog rather than excluded as dead | _owned_ |
+| Environment Sensor T1 | **Zigbee** temp/humidity | Karls Bedroom | **ZHA** (via Tube gw) | _(Zigbee, not IP)_ | — | Tuya `TS0601` (`_TZE200_a8sdabtg`) = a **ZG-227Z** (TLSR8253 + AHT20) — so it is **[ZigbeeTLc-flashable](sensor-reporting.md#the-environment-sensor-t1-is-a-zg-227z--and-it-is-flashable)**, which would replace its slow `EF00` reporting with standard ZCL clusters. ⚠️ **Do not flash this one** — `sensor.temperaturer_t1_*` is ✅ **live on CT 6005** (battery 100%) and **load-bearing**: the `secondary` input to Karl's night heating, watched by the sensor watchdog rather than excluded as dead. Prove the conversion on a spare first | _owned_ |
 | Nest Protect | Smoke/CO alarm | _TODO_ | _TODO_ (Nest) | IoT · `10.40.2.131` | `d8:c8:0c:b0:9e:28` | Nest Protect | _owned_ |
 | Meross Smart Plug | Smart plug | Garage | `meross_lan` (local) | IoT · `10.40.170.241` | `48:e1:e9:dd:88:d9` | Meross `mss310` | _owned_ |
 | Samsung Washer | Appliance | Laundry | **SmartThings** (cloud OAuth) | IoT · `10.40.84.50` | `50:fd:d5:85:6c:92` | Samsung `DA_WM_TP2_20`. ✅ live — 16 entities (`sensor.laundry_room_washer_machine_state`, energy, `switch.…_bubble_soak`, …). Auth is **`auth_implementation: cloud`** and has to be — see [Samsung washer](#samsung-washer--why-it-is-stuck-on-cloud-account-linking) | _owned_ |
 | Xiaomi Temp & Humidity Monitor 2 ×2 | BLE temp/humidity | _TODO_ | ✅ **pvvx `ATC_v58` → BTHome v2** (unencrypted) → HA via Tube-gw BLE proxy ([done →](devices/xiaomi-lywsd03mmc/)) | _not IP (BLE, battery)_ | `A4:C1:38:1F:09:C0`, `A4:C1:38:20:6E:6B` | `LYWSD03MMC` **HW B1.4**; flashed 2026-07-20 (`ATC_1F09C0` / `ATC_206E6B`); Mi keys in BW | _owned (2026-07-18)_ |
+| Mi Door and Window Sensor 2 | **BLE** contact + illuminance | _TODO_ | planned — **`xiaomi_ble`** via Tube-gw BLE proxy ([docs →](devices/mi-door-window-sensor-2/)) | _not IP (BLE, battery)_ | _TODO_ | `MCCGQ02HL` — **BLE, not Zigbee** (the older `MCCGQ01LM`/`MCCGQ11LM` was Zigbee; the "2" is not). **Not set up yet.** Needs a **Mi bindkey at runtime, permanently** — without it only RSSI appears. No pvvx/BTHome firmware exists for it, so it stays on stock | _owned_ |
 | **Tube's ZB Gateway** | Zigbee coordinator **+ BLE proxy (ON)** | Garage | **ZHA** today (`socket://…:6638`); → Z2M planned ([docs →](devices/tube-zb-gw-efr32/)) | legacy · `192.168.179.222` → **move to IoT 1040** | `20:43:a8:c7:62:b3` | OEM "藏机/Cangji" TubesZB `efr32-MGM210-poe` clone; web login `cangji`/`cangji` (in BW); ⚠️ `Esp_Bluetooth` **ON since 2026-07-20** as the LYWSD03MMC BLE proxy — *prev flooded HA ×2, monitor* | _owned_ |
 | Xiaomi Smart Home Hub 2 | Multi-protocol hub | _TODO_ | _TODO_ — Zigbee/BLE/IR ([notes →](devices/xiaomi-smart-home-hub-2/)) | **⚠️ detect** (Wi-Fi) | _TODO_ | Alt Zigbee/BLE hub; not the local-first BLE relay | _owned_ |
 | Leapmotor C10 | EV (telemetry) | Driveway | Leapmotor Mate (CT 4100) → MQTT → HA | _(cloud API)_ | — | VIN `LFZ93AN93SD112595`; incl. Digital Key | _owned_ |
@@ -280,12 +281,14 @@ Devices with their own reverse-engineering / integration notes live under [`devi
 - [`tube-zb-gw-efr32/`](devices/tube-zb-gw-efr32/) — TubesZB Zigbee coordinator (ESP32 + EFR32, PoE): access/handbook, the OEM-clone finding, the `Esp_Bluetooth` HA-flood incident, and the Z2M/XZG plans.
 - [`xiaomi-lywsd03mmc/`](devices/xiaomi-lywsd03mmc/) — Xiaomi LYWSD03MMC BLE thermometers: the "HA has no Bluetooth" root cause, pvvx/BTHome flashing, HW-B1.6 caveat, and BLE-proxy relay options.
 - [`xiaomi-smart-home-hub-2/`](devices/xiaomi-smart-home-hub-2/) — Xiaomi Hub 2 (Zigbee/BLE/IR): integration options + why it isn't the local-first BLE relay yet.
+- [`mi-door-window-sensor-2/`](devices/mi-door-window-sensor-2/) — Mi Door & Window Sensor 2 (`MCCGQ02HL`): why it's **BLE not Zigbee**, the permanent-bindkey requirement, and why no custom firmware exists.
 
 ## To identify / tidy
 - **Wi-Fi IPs** for the Tuya/Tapo/Broadlink devices — capture from UniFi + DHCP-reserve.
 - **The four dark Tuya devices** (both fans, both smart plugs) — check power/Wi-Fi at the device;
   they have not reached the Tuya cloud once since 2026-08-09 ([why that is device-side](#tuya--cloud-only-and-half-the-fleet-is-dark)).
 - **Tube's ZB Gateway** (`192.168.179.222`) — on the **legacy** net; move to **IoT 1040** + DHCP-reserve before any Z2M cutover (see [deep-dive](devices/tube-zb-gw-efr32/)).
+- **Apple TV 4K “gen 3” — confirm the exact model** (Settings → General → About). The 128 GB Wi-Fi+Ethernet (`A2843`) is a **Thread border router**; the 64 GB Wi-Fi-only (`A2737`) has **no Thread radio**. This decides whether we already own one — see [`thread-and-matter.md`](thread-and-matter.md).
 - **Consumer/media devices on the legacy net** (Echoes, Apple TV, Philips TV, Sony TV) — still on legacy `192.168.178/9`, not segmented onto **Consumer 1020** or **IoT 1040**. Tidy-up candidate.
 - **Xiaomi Hub 2** — power on + find on UniFi (Wi-Fi), DHCP-reserve, record model/MAC ([notes](devices/xiaomi-smart-home-hub-2/)).
 - _Resolved 2026-07-20:_ ~~**Xiaomi thermometers** — check HW revision~~ → **B1.4**, both flashed **pvvx `ATC_v58` → BTHome v2** and in HA ([done](devices/xiaomi-lywsd03mmc/)).
@@ -298,6 +301,8 @@ Devices with their own reverse-engineering / integration notes live under [`devi
 
 ## Related docs
 - [`esp-fleet.md`](esp-fleet.md) — bare ESP boards on hand for DIY builds (BLE proxy, ESL-2, sensors) + which chip does what.
+- [`sensor-reporting.md`](sensor-reporting.md) — why the Tuya temp/humidity sensors are slow (`EF00` ignores `configure_reporting`), the `zha-toolkit` fix, the battery ceiling, and what to buy.
+- [`thread-and-matter.md`](thread-and-matter.md) — we have a Matter controller but **no Thread border router**; the border-router options and why Matter sensors don't fix reporting speed.
 
 ## Notes
 - **Integrations at a glance:** Zigbee → **ZHA** (via Tube gw); Matter → matter-server (CT 6001);
