@@ -103,6 +103,39 @@ spec:
   # happened to pick a high one, but a reconnect can recompute. Proxmox cannot express
   # this, so it is a guest-side post-deploy step, not something this shape can enforce.
 
+  # ── HOME ASSISTANT'S OWN BACKUPS LAND ON THE NAS, NOT ON THIS CT.
+  # Added 2026-08-23, implementing the decision recorded in #27: HA's `.storage` is not
+  # reproducible from this shape and is never going in this repo, so the instance is BACKED UP
+  # rather than declared. Worth stating plainly -- before this, CT 6005 had never been backed
+  # up at all, so the "rebuild restores from that" half of #27 did not actually exist.
+  #
+  # WHY A BIND AND NOT AN INTEGRATION. HA Container's only backup agent writes to
+  # /config/backups, which is inside the `hass_config` Docker volume. Binding the NAS there
+  # turns that local agent into an off-box one, with no NAS credential stored inside HA. The
+  # official `synology_dsm` backup agent was the obvious route and was rejected: its config
+  # flow calls SYNO.Core.System.Utilization during validation, which is admin-only in DSM 7,
+  # so it cannot be set up with a least-privilege account no matter what the agent itself needs.
+  #
+  # WHY CIFS AND NOT NFS. The NAS exports whole volumes over NFS with host-IP authorisation
+  # only (`/volume2/Volume-2` to 10.0.0.0/16), so NFS would have meant exporting a new share to
+  # a whole subnet. CIFS authenticates as the dedicated DSM user `homeassistant`, which can
+  # reach nothing but this one share.
+  #
+  # ⚠️ THE CIFS MOUNT ITSELF IS NOT EXPRESSIBLE HERE. `source` is a host path; the
+  # //10.0.0.10/Homeassistant-Backup -> /mnt/ha-backup mount lives in hpe-01's /etc/fstab and
+  # converge neither creates nor checks it. If it is missing, this bind resolves to an EMPTY
+  # LOCAL DIRECTORY and backups look successful while going nowhere. Tracked in
+  # Homelab#488 (shapes cannot declare a CIFS-backed, storage-gated mount).
+  #
+  # ⚠️ `uid=100000,gid=100000` in that fstab entry is load-bearing. This CT is unprivileged, so
+  # its root is 100000 on the host; without forcing the CIFS mount to that owner HA cannot
+  # write to its own backup directory.
+  mounts:
+    - type: bind
+      source: /mnt/ha-backup
+      target: /var/lib/docker/volumes/hass_config/_data/backups
+      backup: false        # do not vzdump the backup target into another backup
+
   onboot: true
 
   # Converge ordering only — the broker and Matter server should exist before HA does.
