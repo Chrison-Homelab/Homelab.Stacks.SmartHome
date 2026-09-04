@@ -39,6 +39,12 @@ metadata:
   name: esphome
   stack: SmartHome
   tags: [smart-home, iot, esphome, community-script]
+  services:            # dashboard tile (superproject ADR-0012). IoT VLAN — the dashboard host may not reach it for the health dot.
+    - name: ESPHome
+      url: http://esphome.iot.chrison.internal:6052
+      icon: esphome
+      description: Firmware builder for the ESP32 fleet
+      widget: { type: esphome }
 
 spec:
   app: esphome           # community-scripts slug → ct/esphome.sh (native dashboard + toolchain)
