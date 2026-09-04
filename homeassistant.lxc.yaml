@@ -25,6 +25,12 @@ metadata:
   name: homeassistant
   stack: SmartHome
   tags: [smart-home, home-assistant, docker]
+  services:            # dashboard tile (superproject ADR-0012) — internal URL; public URL derives from the Pangolin resource
+    - name: Home Assistant
+      url: http://homeassistant.iot.chrison.internal:8123
+      icon: home-assistant
+      description: The smart home
+      widget: { type: homeassistant, keyFrom: HOMEASSISTANT_TOKEN }
   description: >-
     Home Assistant Container on a community-scripts LXC. The smart-home hub: MQTT via
     the broker (CT 6000), Matter via the standalone server (CT 6001), ESPHome via CT
