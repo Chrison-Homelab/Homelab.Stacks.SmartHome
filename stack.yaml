@@ -2,7 +2,7 @@
 #
 # Home Assistant IS a member of this stack as of 2026-08-09 — CT 6005, HA Container
 # (see homeassistant.lxc.yaml). The hand-built HAOS VM 2000 it replaced is retired and
-# stopped, kept only as a rollback. Alongside HA this stack carries the *supporting
+# was destroyed 2026-10-04 after a final PBS backup (vm/2000/2026-10-04T00:14:58Z). Alongside HA this stack carries the *supporting
 # infrastructure* that feeds it: an MQTT broker,
 # with room to grow (zigbee2mqtt, node-red, esphome, zwave-js-ui, frigate, …) as
 # the need arises — each a new member dropped into this same stack + broker.
@@ -17,9 +17,9 @@
 #   - homeassistant — CT 6005, the hub (see homeassistant.lxc.yaml). HA Container
 #     via community-scripts; dual-homed Homelab 1010 (primary) + IoT 1040 leg.
 #   - homeassistant — VMID 2000, RETIRED (see homeassistant.vm.yaml). The old HAOS
-#     VM this stack used to merely feed. Stopped, onboot false, manage: retired;
-#     kept only as a rollback. NEVER run it alongside CT 6005 — they share the
-#     broker, the Matter server and the Zigbee coordinator.
+#     VM this stack used to merely feed. manage: retired; DESTROYED 2026-10-04 after a
+#     final PBS backup. If it is ever restored, NEVER run it alongside CT 6005 — they
+#     share the broker, the Matter server and the Zigbee coordinator.
 #
 # EXPOSURE — INTERNAL-ONLY. MQTT is never exposed publicly. The broker lives on
 # the IoT VLAN (1040). HA (CT 6005) reaches it at LAYER 2 over its IoT leg — no
